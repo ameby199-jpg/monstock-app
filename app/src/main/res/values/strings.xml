@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MonStock</string>
+    <string name="login_title">Connexion</string>
+    <string name="email">E-mail</string>
+    <string name="password">Mot de passe</string>
+    <string name="login_btn">Se connecter</string>
+    <string name="register_btn">Créer un compte</string>
+    <string name="stock">Stock</string>
+    <string name="sales">Ventes</string>
+    <string name="reports">Rapports</string>
+    <string name="add_product">Ajouter un produit</string>
+    <string name="product_name">Nom du produit</string>
+    <string name="quantity">Quantité</string>
+    <string name="price">Prix unitaire</string>
+    <string name="save">Enregistrer</string>
+    <string name="cancel">Annuler</string>
+    <string name="sell">Vendre</string>
+    <string name="total_revenue_today">Chiffre d\'affaires aujourd\'hui</string>
+    <string name="total_revenue_week">Cette semaine</string>
+    <string name="total_revenue_month">Ce mois-ci</string>
+    <string name="top_products">Produits les plus vendus</string>
+</resources>

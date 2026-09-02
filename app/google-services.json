@@ -1,0 +1,9 @@
+{
+  "_COMMENT": "REMPLACE CE FICHIER par celui téléchargé depuis la console Firebase (Paramètres du projet > Vos applications > google-services.json). Sans ce remplacement, l'application ne pourra pas se connecter à Firebase.",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "remplace-moi"
+  },
+  "client": [],
+  "configuration_version": "1"
+}

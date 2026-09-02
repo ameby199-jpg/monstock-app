@@ -1,0 +1,26 @@
+workflows:
+  monstock-android:
+    name: MonStock Android Build
+    max_build_duration: 30
+    environment:
+      groups: []
+      vars:
+        PACKAGE_NAME: "com.monstock.app"
+    scripts:
+      - name: Générer le Gradle Wrapper si absent
+        script: |
+          if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
+            curl -s "https://get.sdkman.io" | bash
+            source "$HOME/.sdkman/bin/sdkman-init.sh"
+            sdk install gradle 8.4 || true
+            gradle wrapper --gradle-version 8.4 --distribution-type bin
+          fi
+          chmod +x ./gradlew
+      - name: Compiler l'APK (debug)
+        script: |
+          ./gradlew assembleDebug --stacktrace
+    artifacts:
+      - app/build/outputs/**/*.apk
+    publishing:
+      email:
+        recipients: []
