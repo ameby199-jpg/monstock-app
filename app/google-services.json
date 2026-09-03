@@ -1,9 +1,29 @@
 {
-  "_COMMENT": "REMPLACE CE FICHIER par celui téléchargé depuis la console Firebase (Paramètres du projet > Vos applications > google-services.json). Sans ce remplacement, l'application ne pourra pas se connecter à Firebase.",
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "remplace-moi"
+    "project_number": "611269480514",
+    "project_id": "monstock-e62d3",
+    "storage_bucket": "monstock-e62d3.firebasestorage.app"
   },
-  "client": [],
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:611269480514:android:a57d88f276fdec2ef81ddb",
+        "android_client_info": {
+          "package_name": "com.monstock.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-EWPvbTLngy-xVWDAaWYv5mXSIGoxzgA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
   "configuration_version": "1"
 }
