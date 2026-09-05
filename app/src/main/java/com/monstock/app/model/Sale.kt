@@ -8,5 +8,6 @@ data class Sale(
     var unitPrice: Double = 0.0,
     var total: Double = 0.0,
     var timestamp: Long = 0,
+    var paymentMethod: String = "Espèces",
     var ownerId: String = ""
 )

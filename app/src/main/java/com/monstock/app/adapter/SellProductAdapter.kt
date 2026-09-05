@@ -6,22 +6,20 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.monstock.app.R
-import com.monstock.app.databinding.ItemProductBinding
+import com.monstock.app.databinding.ItemSellProductBinding
 import com.monstock.app.model.Product
 import java.text.NumberFormat
 import java.util.Locale
 
-class ProductAdapter(
+class SellProductAdapter(
     private var items: List<Product>,
-    private val onSell: (Product) -> Unit,
-    private val onDelete: (Product) -> Unit,
-    private val onPhoto: ((Product) -> Unit)? = null
-) : RecyclerView.Adapter<ProductAdapter.VH>() {
+    private val onClick: (Product) -> Unit
+) : RecyclerView.Adapter<SellProductAdapter.VH>() {
 
-    inner class VH(val binding: ItemProductBinding) : RecyclerView.ViewHolder(binding.root)
+    inner class VH(val binding: ItemSellProductBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val binding = ItemProductBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = ItemSellProductBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return VH(binding)
     }
 
@@ -38,11 +36,7 @@ class ProductAdapter(
             holder.binding.ivPhoto.setImageResource(R.drawable.ic_product_placeholder)
         }
 
-        holder.binding.btnSell.setOnClickListener { onSell(product) }
-        holder.binding.btnDelete.setOnClickListener { onDelete(product) }
-        if (onPhoto != null) {
-            holder.binding.ivPhoto.setOnClickListener { onPhoto.invoke(product) }
-        }
+        holder.binding.root.setOnClickListener { onClick(product) }
     }
 
     override fun getItemCount() = items.size

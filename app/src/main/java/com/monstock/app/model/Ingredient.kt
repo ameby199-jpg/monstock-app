@@ -1,10 +1,9 @@
 package com.monstock.app.model
 
-data class Product(
+data class Ingredient(
     var id: String = "",
     var name: String = "",
-    var quantity: Long = 0,
-    var price: Double = 0.0,
-    var photoBase64: String = "",
+    var quantity: Double = 0.0,
+    var unit: String = "",
     var ownerId: String = ""
 )

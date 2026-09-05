@@ -9,6 +9,7 @@ import android.content.Context
 object ShopPrefs {
     private const val PREFS = "monstock_prefs"
     private const val KEY_SHOP = "shop_code"
+    private const val KEY_EMAIL = "last_email"
 
     fun getShopCode(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -18,5 +19,15 @@ object ShopPrefs {
     fun setShopCode(context: Context, code: String) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_SHOP, code.trim().lowercase()).apply()
+    }
+
+    fun getLastEmail(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_EMAIL, null)
+    }
+
+    fun setLastEmail(context: Context, email: String) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_EMAIL, email.trim()).apply()
     }
 }

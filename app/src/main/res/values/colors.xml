@@ -8,4 +8,8 @@
     <color name="background">#F5F5F5</color>
     <color name="danger">#E53935</color>
     <color name="ic_launcher_background">#1565C0</color>
+    <color name="cash">#2E7D32</color>
+    <color name="orange_money">#FF6600</color>
+    <color name="wave">#1DA1F2</color>
+    <color name="surface">#FFFFFF</color>
 </resources>
