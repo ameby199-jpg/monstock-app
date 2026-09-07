@@ -20,7 +20,7 @@ class MainActivity : AppCompatActivity() {
 
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragmentContainer, StockFragment())
+                .replace(R.id.fragmentContainer, SellFragment())
                 .commit()
         }
 

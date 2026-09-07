@@ -22,12 +22,16 @@ class IngredientAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val ingredient = items[position]
         holder.binding.tvName.text = ingredient.name
-        val qtyText = if (ingredient.quantity == ingredient.quantity.toLong().toDouble()) {
-            ingredient.quantity.toLong().toString()
+        if (ingredient.unit == "FCFA") {
+            holder.binding.tvDetails.text = com.monstock.app.util.CurrencyFormatter.format(ingredient.quantity)
         } else {
-            ingredient.quantity.toString()
+            val qtyText = if (ingredient.quantity == ingredient.quantity.toLong().toDouble()) {
+                ingredient.quantity.toLong().toString()
+            } else {
+                ingredient.quantity.toString()
+            }
+            holder.binding.tvDetails.text = "$qtyText ${ingredient.unit}"
         }
-        holder.binding.tvDetails.text = "$qtyText ${ingredient.unit}"
         holder.binding.btnEdit.setOnClickListener { onEdit(ingredient) }
         holder.binding.btnDelete.setOnClickListener { onDelete(ingredient) }
     }

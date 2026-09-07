@@ -14,6 +14,7 @@ import com.monstock.app.databinding.DialogAddIngredientBinding
 import com.monstock.app.databinding.DialogEditQuantityBinding
 import com.monstock.app.databinding.FragmentIngredientsBinding
 import com.monstock.app.model.Ingredient
+import com.monstock.app.util.DeleteGuard
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 
@@ -40,7 +41,13 @@ class IngredientsFragment : Fragment() {
         adapter = IngredientAdapter(
             items = emptyList(),
             onEdit = { showEditQuantityDialog(it) },
-            onDelete = { repo.deleteIngredient(it.id) }
+            onDelete = { ingredient ->
+                DeleteGuard.confirmDelete(requireContext(), ingredient.name) {
+                    repo.deleteIngredient(ingredient.id) { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -61,7 +68,11 @@ class IngredientsFragment : Fragment() {
             .setPositiveButton(R.string.save) { _, _ ->
                 val name = dialogBinding.etName.text.toString().trim()
                 val qty = dialogBinding.etQuantity.text.toString().toDoubleOrNull() ?: 0.0
-                val unit = dialogBinding.etUnit.text.toString().trim()
+                val unit = when (dialogBinding.rgUnitType.checkedRadioButtonId) {
+                    dialogBinding.rbNombre.id -> "Nombre"
+                    dialogBinding.rbSomme.id -> "FCFA"
+                    else -> "Kg"
+                }
                 if (name.isNotEmpty()) {
                     repo.addIngredient(name, qty, unit) { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
@@ -81,7 +92,9 @@ class IngredientsFragment : Fragment() {
             .setPositiveButton(R.string.save) { _, _ ->
                 val newQty = dialogBinding.etNewQuantity.text.toString().toDoubleOrNull()
                 if (newQty != null) {
-                    repo.updateIngredientQuantity(ingredient.id, newQty)
+                    repo.updateIngredientQuantity(ingredient.id, newQty) { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             }
             .setNegativeButton(R.string.cancel, null)

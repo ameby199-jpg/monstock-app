@@ -11,11 +11,10 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.monstock.app.databinding.FragmentReportsBinding
 import com.monstock.app.databinding.ItemSaleBinding
 import com.monstock.app.model.Sale
+import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
-import java.text.NumberFormat
 import java.util.Calendar
-import java.util.Locale
 
 class ReportsFragment : Fragment() {
 
@@ -41,7 +40,6 @@ class ReportsFragment : Fragment() {
     }
 
     private fun updateStats(sales: List<Sale>) {
-        val format = NumberFormat.getCurrencyInstance(Locale.FRANCE)
         val now = Calendar.getInstance()
 
         val startOfDay = Calendar.getInstance().apply {
@@ -61,13 +59,17 @@ class ReportsFragment : Fragment() {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
         }.timeInMillis
 
-        val totalToday = sales.filter { it.timestamp >= startOfDay }.sumOf { it.total }
-        val totalWeek = sales.filter { it.timestamp >= startOfWeek }.sumOf { it.total }
-        val totalMonth = sales.filter { it.timestamp >= startOfMonth }.sumOf { it.total }
+        val salesToday = sales.filter { it.timestamp >= startOfDay }
+        val salesWeek = sales.filter { it.timestamp >= startOfWeek }
+        val salesMonth = sales.filter { it.timestamp >= startOfMonth }
 
-        binding.tvToday.text = format.format(totalToday)
-        binding.tvWeek.text = format.format(totalWeek)
-        binding.tvMonth.text = format.format(totalMonth)
+        binding.tvToday.text = CurrencyFormatter.format(salesToday.sumOf { it.total })
+        binding.tvWeek.text = CurrencyFormatter.format(salesWeek.sumOf { it.total })
+        binding.tvMonth.text = CurrencyFormatter.format(salesMonth.sumOf { it.total })
+
+        binding.tvTodayBreakdown.text = paymentBreakdown(salesToday)
+        binding.tvWeekBreakdown.text = paymentBreakdown(salesWeek)
+        binding.tvMonthBreakdown.text = paymentBreakdown(salesMonth)
 
         val topByProduct = sales.groupBy { it.productName }
             .map { (name, list) -> Triple(name, list.sumOf { it.quantity }, list.sumOf { it.total }) }
@@ -75,6 +77,15 @@ class ReportsFragment : Fragment() {
             .take(10)
 
         binding.recyclerViewTop.adapter = TopProductAdapter(topByProduct)
+    }
+
+    private fun paymentBreakdown(sales: List<Sale>): String {
+        if (sales.isEmpty()) return "Aucune vente"
+        val byMethod = sales.groupBy { it.paymentMethod }
+        return listOf("Espèces", "Orange Money", "Wave").mapNotNull { method ->
+            val total = byMethod[method]?.sumOf { it.total } ?: return@mapNotNull null
+            "$method: ${CurrencyFormatter.format(total)}"
+        }.joinToString("  •  ")
     }
 
     override fun onDestroyView() {
@@ -97,9 +108,10 @@ private class TopProductAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val (name, qty, total) = items[position]
-        val format = NumberFormat.getCurrencyInstance(Locale.FRANCE)
         holder.binding.tvSaleName.text = name
-        holder.binding.tvSaleDetails.text = "Vendu: $qty  •  ${format.format(total)}"
+        holder.binding.tvSaleDetails.text = "Vendu: $qty  •  ${CurrencyFormatter.format(total)}"
+        holder.binding.tvSalePayment.text = ""
+        holder.binding.viewPaymentDot.visibility = android.view.View.GONE
     }
 
     override fun getItemCount() = items.size

@@ -49,6 +49,7 @@ class SellFragment : Fragment() {
 
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
+        dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
         AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)

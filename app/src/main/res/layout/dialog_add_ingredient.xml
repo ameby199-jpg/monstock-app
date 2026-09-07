@@ -19,11 +19,42 @@
         android:inputType="numberDecimal"
         android:layout_marginTop="8dp" />
 
-    <EditText
-        android:id="@+id/etUnit"
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Type d'unité"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="4dp" />
+
+    <RadioGroup
+        android:id="@+id/rgUnitType"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/unit"
-        android:layout_marginTop="8dp" />
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/rbKg"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Kg"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/rbNombre"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Nombre" />
+
+        <RadioButton
+            android:id="@+id/rbSomme"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Somme (FCFA)" />
+
+    </RadioGroup>
 
 </LinearLayout>

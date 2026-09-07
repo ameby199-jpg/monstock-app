@@ -88,7 +88,13 @@ class StockFragment : Fragment() {
         adapter = ProductAdapter(
             items = emptyList(),
             onSell = { showSellDialog(it) },
-            onDelete = { repo.deleteProduct(it.id) },
+            onDelete = { product ->
+                com.monstock.app.util.DeleteGuard.confirmDelete(requireContext(), product.name) {
+                    repo.deleteProduct(product.id) { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
             onPhoto = { showPhotoSourceChooser(it) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -130,6 +136,7 @@ class StockFragment : Fragment() {
 
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
+        dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
         AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)

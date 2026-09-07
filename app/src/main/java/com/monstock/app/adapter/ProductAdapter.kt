@@ -8,8 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.monstock.app.R
 import com.monstock.app.databinding.ItemProductBinding
 import com.monstock.app.model.Product
-import java.text.NumberFormat
-import java.util.Locale
+import com.monstock.app.util.CurrencyFormatter
 
 class ProductAdapter(
     private var items: List<Product>,
@@ -27,9 +26,8 @@ class ProductAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val product = items[position]
-        val format = NumberFormat.getCurrencyInstance(Locale.FRANCE)
         holder.binding.tvName.text = product.name
-        holder.binding.tvDetails.text = "Qté: ${product.quantity}  •  ${format.format(product.price)}"
+        holder.binding.tvDetails.text = "Qté: ${product.quantity}  •  ${CurrencyFormatter.format(product.price)}"
 
         val bitmap = decodePhoto(product.photoBase64)
         if (bitmap != null) {

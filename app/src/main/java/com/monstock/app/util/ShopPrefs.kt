@@ -9,7 +9,18 @@ import android.content.Context
 object ShopPrefs {
     private const val PREFS = "monstock_prefs"
     private const val KEY_SHOP = "shop_code"
+    private const val KEY_DELETE_CODE = "delete_code"
     private const val KEY_EMAIL = "last_email"
+
+    fun getDeleteCode(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_DELETE_CODE, null)
+    }
+
+    fun setDeleteCode(context: Context, code: String) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_DELETE_CODE, code).apply()
+    }
 
     fun getShopCode(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

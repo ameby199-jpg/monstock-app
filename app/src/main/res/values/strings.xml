@@ -21,6 +21,7 @@
     <string name="total_revenue_month">Ce mois-ci</string>
     <string name="top_products">Produits les plus vendus</string>
     <string name="nav_sell">Vendre</string>
+    <string name="nav_home">Accueil</string>
     <string name="nav_ingredients">Ingrédients</string>
     <string name="add_ingredient">Ajouter un ingrédient</string>
     <string name="ingredient_name">Nom de l\'ingrédient</string>
