@@ -13,6 +13,7 @@ import com.monstock.app.adapter.SellProductAdapter
 import com.monstock.app.databinding.DialogSellBinding
 import com.monstock.app.databinding.FragmentSellBinding
 import com.monstock.app.model.Product
+import com.monstock.app.model.Sale
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 
@@ -22,7 +23,11 @@ class SellFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var repo: FirebaseRepo
     private lateinit var adapter: SellProductAdapter
-    private var listener: ListenerRegistration? = null
+    private var productsListener: ListenerRegistration? = null
+    private var salesListener: ListenerRegistration? = null
+
+    private var latestProducts: List<Product> = emptyList()
+    private var salesCountByProductId: Map<String, Long> = emptyMap()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -40,11 +45,25 @@ class SellFragment : Fragment() {
         binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
         binding.recyclerView.adapter = adapter
 
-        listener = repo.listenProducts { products ->
-            val inStock = products.filter { it.quantity > 0 }
-            adapter.updateData(inStock)
-            binding.tvEmpty.visibility = if (inStock.isEmpty()) View.VISIBLE else View.GONE
+        productsListener = repo.listenProducts { products ->
+            latestProducts = products
+            refreshList()
         }
+        salesListener = repo.listenSales { sales ->
+            salesCountByProductId = sales.groupBy { it.productId }.mapValues { (_, list) -> list.sumOf { it.quantity } }
+            refreshList()
+        }
+    }
+
+    /** Les produits les plus vendus apparaissent en premier ; les jamais vendus restent en bas. */
+    private fun refreshList() {
+        val inStock = latestProducts.filter { it.quantity > 0 }
+        val sorted = inStock.sortedWith(
+            compareByDescending<Product> { salesCountByProductId[it.id] ?: 0L }
+                .thenBy { it.name.lowercase() }
+        )
+        adapter.updateData(sorted)
+        binding.tvEmpty.visibility = if (sorted.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun showSellDialog(product: Product) {
@@ -72,7 +91,8 @@ class SellFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        listener?.remove()
+        productsListener?.remove()
+        salesListener?.remove()
         _binding = null
     }
 }

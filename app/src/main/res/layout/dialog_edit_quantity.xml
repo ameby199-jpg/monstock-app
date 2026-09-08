@@ -6,10 +6,34 @@
     android:padding="24dp">
 
     <EditText
-        android:id="@+id/etNewQuantity"
+        android:id="@+id/etPrice"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/quantity"
+        android:hint="Prix des produits (FCFA)"
         android:inputType="numberDecimal" />
+
+    <EditText
+        android:id="@+id/etStockActuel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Stock actuel (FCFA)"
+        android:inputType="numberDecimal"
+        android:layout_marginTop="8dp" />
+
+    <EditText
+        android:id="@+id/etAchatDuJour"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Achat du jour (FCFA)"
+        android:inputType="numberDecimal"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stock présent et Dépensé du jour se calculent automatiquement."
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:layout_marginTop="8dp" />
 
 </LinearLayout>

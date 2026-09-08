@@ -1,10 +1,12 @@
 package com.monstock.app.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.monstock.app.databinding.ItemIngredientBinding
 import com.monstock.app.model.Ingredient
+import com.monstock.app.util.CurrencyFormatter
 
 class IngredientAdapter(
     private var items: List<Ingredient>,
@@ -20,20 +22,26 @@ class IngredientAdapter(
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val ingredient = items[position]
-        holder.binding.tvName.text = ingredient.name
-        if (ingredient.unit == "FCFA") {
-            holder.binding.tvDetails.text = com.monstock.app.util.CurrencyFormatter.format(ingredient.quantity)
+        val ing = items[position]
+        holder.binding.tvName.text = ing.name
+        holder.binding.tvPrice.text = "Prix: ${CurrencyFormatter.format(ing.price)}"
+        holder.binding.tvStockActuel.text = "Stock actuel: ${CurrencyFormatter.format(ing.stockActuel)}"
+
+        if (ing.achatDuJour != 0.0) {
+            holder.binding.tvStockPresent.visibility = View.VISIBLE
+            holder.binding.tvAchat.visibility = View.VISIBLE
+            holder.binding.tvDepense.visibility = View.VISIBLE
+            holder.binding.tvStockPresent.text = "Stock présent (auto): ${CurrencyFormatter.format(ing.stockPresent)}"
+            holder.binding.tvAchat.text = "Achat du jour: ${CurrencyFormatter.format(ing.achatDuJour)}"
+            holder.binding.tvDepense.text = "Dépensé du jour (auto): ${CurrencyFormatter.format(ing.depenseDuJour)}"
         } else {
-            val qtyText = if (ingredient.quantity == ingredient.quantity.toLong().toDouble()) {
-                ingredient.quantity.toLong().toString()
-            } else {
-                ingredient.quantity.toString()
-            }
-            holder.binding.tvDetails.text = "$qtyText ${ingredient.unit}"
+            holder.binding.tvStockPresent.visibility = View.GONE
+            holder.binding.tvAchat.visibility = View.GONE
+            holder.binding.tvDepense.visibility = View.GONE
         }
-        holder.binding.btnEdit.setOnClickListener { onEdit(ingredient) }
-        holder.binding.btnDelete.setOnClickListener { onDelete(ingredient) }
+
+        holder.binding.btnEdit.setOnClickListener { onEdit(ing) }
+        holder.binding.btnDelete.setOnClickListener { onDelete(ing) }
     }
 
     override fun getItemCount() = items.size

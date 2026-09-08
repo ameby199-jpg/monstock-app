@@ -12,4 +12,8 @@
     <color name="orange_money">#FF6600</color>
     <color name="wave">#1DA1F2</color>
     <color name="surface">#FFFFFF</color>
+    <color name="col_stock">#2E7D32</color>
+    <color name="col_present">#EF6C00</color>
+    <color name="col_achat">#6A1B9A</color>
+    <color name="col_depense">#C62828</color>
 </resources>

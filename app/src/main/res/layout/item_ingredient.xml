@@ -4,8 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    app:cardBackgroundColor="@color/surface"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -28,11 +29,39 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvDetails"
+                android:id="@+id/tvPrice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:textColor="#666666" />
+                android:textColor="@color/primary" />
+
+            <TextView
+                android:id="@+id/tvStockActuel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/col_stock" />
+
+            <TextView
+                android:id="@+id/tvStockPresent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/col_present" />
+
+            <TextView
+                android:id="@+id/tvAchat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/col_achat" />
+
+            <TextView
+                android:id="@+id/tvDepense"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/col_depense" />
         </LinearLayout>
 
         <ImageButton

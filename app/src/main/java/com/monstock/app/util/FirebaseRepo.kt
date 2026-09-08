@@ -141,8 +141,9 @@ class FirebaseRepo(private val shopCode: String) {
                     Ingredient(
                         id = d.id,
                         name = d.getString("name") ?: "",
-                        quantity = d.getDouble("quantity") ?: 0.0,
-                        unit = d.getString("unit") ?: "",
+                        price = d.getDouble("price") ?: 0.0,
+                        stockActuel = d.getDouble("stockActuel") ?: 0.0,
+                        achatDuJour = d.getDouble("achatDuJour") ?: 0.0,
                         ownerId = shopCode
                     )
                 }
@@ -150,15 +151,32 @@ class FirebaseRepo(private val shopCode: String) {
             }
     }
 
-    fun addIngredient(name: String, quantity: Double, unit: String, onError: (String) -> Unit = {}) {
-        val data = hashMapOf("name" to name, "quantity" to quantity, "unit" to unit)
+    fun addIngredient(name: String, price: Double, stockActuel: Double, onError: (String) -> Unit = {}) {
+        val data = hashMapOf(
+            "name" to name,
+            "price" to price,
+            "stockActuel" to stockActuel,
+            "achatDuJour" to 0.0
+        )
         shopDoc().collection("ingredients").add(data)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement") }
     }
 
-    fun updateIngredientQuantity(ingredientId: String, newQuantity: Double, onError: (String) -> Unit = {}) {
+    /** Met à jour prix / stock actuel / achat du jour ; les colonnes auto sont recalculées côté affichage. */
+    fun updateIngredient(
+        ingredientId: String,
+        price: Double,
+        stockActuel: Double,
+        achatDuJour: Double,
+        onError: (String) -> Unit = {}
+    ) {
+        val data = mapOf(
+            "price" to price,
+            "stockActuel" to stockActuel,
+            "achatDuJour" to achatDuJour
+        )
         shopDoc().collection("ingredients").document(ingredientId)
-            .update("quantity", newQuantity)
+            .update(data)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
     }
 

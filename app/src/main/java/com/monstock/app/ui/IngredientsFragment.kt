@@ -14,6 +14,7 @@ import com.monstock.app.databinding.DialogAddIngredientBinding
 import com.monstock.app.databinding.DialogEditQuantityBinding
 import com.monstock.app.databinding.FragmentIngredientsBinding
 import com.monstock.app.model.Ingredient
+import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.DeleteGuard
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
@@ -40,7 +41,7 @@ class IngredientsFragment : Fragment() {
 
         adapter = IngredientAdapter(
             items = emptyList(),
-            onEdit = { showEditQuantityDialog(it) },
+            onEdit = { showEditDialog(it) },
             onDelete = { ingredient ->
                 DeleteGuard.confirmDelete(requireContext(), ingredient.name) {
                     repo.deleteIngredient(ingredient.id) { msg ->
@@ -57,7 +58,20 @@ class IngredientsFragment : Fragment() {
         listener = repo.listenIngredients { ingredients ->
             adapter.updateData(ingredients)
             binding.tvEmpty.visibility = if (ingredients.isEmpty()) View.VISIBLE else View.GONE
+            updateTotals(ingredients)
         }
+    }
+
+    /** Reproduit la ligne TOTAL du tableau Excel : Stock actuel, Stock présent (auto), Achat/Dépensé du jour (auto). */
+    private fun updateTotals(ingredients: List<Ingredient>) {
+        val totalStockActuel = ingredients.sumOf { it.stockActuel }
+        val totalStockPresent = ingredients.sumOf { it.stockPresent }
+        val totalAchat = ingredients.sumOf { it.achatDuJour }
+
+        binding.tvTotalStock.text =
+            "Stock actuel: ${CurrencyFormatter.format(totalStockActuel)}  •  Stock présent (auto): ${CurrencyFormatter.format(totalStockPresent)}"
+        binding.tvTotalAchat.text =
+            "Achat du jour: ${CurrencyFormatter.format(totalAchat)}  •  Dépensé du jour (auto): ${CurrencyFormatter.format(totalAchat)}"
     }
 
     private fun showAddDialog() {
@@ -67,14 +81,10 @@ class IngredientsFragment : Fragment() {
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.save) { _, _ ->
                 val name = dialogBinding.etName.text.toString().trim()
-                val qty = dialogBinding.etQuantity.text.toString().toDoubleOrNull() ?: 0.0
-                val unit = when (dialogBinding.rgUnitType.checkedRadioButtonId) {
-                    dialogBinding.rbNombre.id -> "Nombre"
-                    dialogBinding.rbSomme.id -> "FCFA"
-                    else -> "Kg"
-                }
+                val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: 0.0
+                val stockActuel = dialogBinding.etStockActuel.text.toString().toDoubleOrNull() ?: 0.0
                 if (name.isNotEmpty()) {
-                    repo.addIngredient(name, qty, unit) { msg ->
+                    repo.addIngredient(name, price, stockActuel) { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
@@ -83,18 +93,20 @@ class IngredientsFragment : Fragment() {
             .show()
     }
 
-    private fun showEditQuantityDialog(ingredient: Ingredient) {
+    private fun showEditDialog(ingredient: Ingredient) {
         val dialogBinding = DialogEditQuantityBinding.inflate(layoutInflater)
-        dialogBinding.etNewQuantity.setText(ingredient.quantity.toString())
+        dialogBinding.etPrice.setText(ingredient.price.toString())
+        dialogBinding.etStockActuel.setText(ingredient.stockActuel.toString())
+        dialogBinding.etAchatDuJour.setText(ingredient.achatDuJour.toString())
         AlertDialog.Builder(requireContext())
-            .setTitle(R.string.edit_quantity)
+            .setTitle(ingredient.name)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.save) { _, _ ->
-                val newQty = dialogBinding.etNewQuantity.text.toString().toDoubleOrNull()
-                if (newQty != null) {
-                    repo.updateIngredientQuantity(ingredient.id, newQty) { msg ->
-                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                    }
+                val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: ingredient.price
+                val stockActuel = dialogBinding.etStockActuel.text.toString().toDoubleOrNull() ?: ingredient.stockActuel
+                val achat = dialogBinding.etAchatDuJour.text.toString().toDoubleOrNull() ?: 0.0
+                repo.updateIngredient(ingredient.id, price, stockActuel, achat) { msg ->
+                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
