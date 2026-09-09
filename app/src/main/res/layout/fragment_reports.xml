@@ -56,6 +56,21 @@
                     android:textSize="12sp"
                     android:textColor="#888888"
                     android:layout_marginTop="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/total_profit_today"
+                    android:textColor="#666666"
+                    android:layout_marginTop="10dp" />
+
+                <TextView
+                    android:id="@+id/tvTodayProfit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -94,6 +109,21 @@
                     android:textSize="12sp"
                     android:textColor="#888888"
                     android:layout_marginTop="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/total_profit_week"
+                    android:textColor="#666666"
+                    android:layout_marginTop="10dp" />
+
+                <TextView
+                    android:id="@+id/tvWeekProfit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -132,6 +162,21 @@
                     android:textSize="12sp"
                     android:textColor="#888888"
                     android:layout_marginTop="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/total_profit_month"
+                    android:textColor="#666666"
+                    android:layout_marginTop="10dp" />
+
+                <TextView
+                    android:id="@+id/tvMonthProfit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 

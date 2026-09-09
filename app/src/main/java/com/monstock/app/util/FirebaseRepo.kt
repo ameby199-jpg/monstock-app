@@ -39,6 +39,7 @@ class FirebaseRepo(private val shopCode: String) {
                         name = d.getString("name") ?: "",
                         quantity = d.getLong("quantity") ?: 0,
                         price = d.getDouble("price") ?: 0.0,
+                        costPrice = d.getDouble("costPrice") ?: 0.0,
                         photoBase64 = d.getString("photoBase64") ?: "",
                         ownerId = shopCode
                     )
@@ -51,10 +52,16 @@ class FirebaseRepo(private val shopCode: String) {
         name: String,
         quantity: Long,
         price: Double,
+        costPrice: Double = 0.0,
         photo: Bitmap? = null,
         onError: (String) -> Unit = {}
     ) {
-        val data = hashMapOf<String, Any>("name" to name, "quantity" to quantity, "price" to price)
+        val data = hashMapOf<String, Any>(
+            "name" to name,
+            "quantity" to quantity,
+            "price" to price,
+            "costPrice" to costPrice
+        )
         if (photo != null) {
             data["photoBase64"] = compressToBase64(photo)
         }
@@ -105,6 +112,7 @@ class FirebaseRepo(private val shopCode: String) {
                         productName = d.getString("productName") ?: "",
                         quantity = d.getLong("quantity") ?: 0,
                         unitPrice = d.getDouble("unitPrice") ?: 0.0,
+                        costPrice = d.getDouble("costPrice") ?: 0.0,
                         total = d.getDouble("total") ?: 0.0,
                         timestamp = d.getLong("timestamp") ?: 0,
                         paymentMethod = d.getString("paymentMethod") ?: "Espèces",
@@ -128,6 +136,7 @@ class FirebaseRepo(private val shopCode: String) {
             "productName" to product.name,
             "quantity" to quantitySold,
             "unitPrice" to product.price,
+            "costPrice" to product.costPrice,
             "total" to total,
             "timestamp" to System.currentTimeMillis(),
             "paymentMethod" to paymentMethod

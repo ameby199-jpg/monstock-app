@@ -6,6 +6,7 @@ data class Sale(
     var productName: String = "",
     var quantity: Long = 0,
     var unitPrice: Double = 0.0,
+    var costPrice: Double = 0.0,
     var total: Double = 0.0,
     var timestamp: Long = 0,
     var paymentMethod: String = "Espèces",

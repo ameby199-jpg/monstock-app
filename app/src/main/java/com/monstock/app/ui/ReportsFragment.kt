@@ -84,6 +84,10 @@ class ReportsFragment : Fragment() {
         binding.tvWeekBreakdown.text = paymentBreakdown(salesWeek)
         binding.tvMonthBreakdown.text = paymentBreakdown(salesMonth)
 
+        binding.tvTodayProfit.text = CurrencyFormatter.format(profit(salesToday))
+        binding.tvWeekProfit.text = CurrencyFormatter.format(profit(salesWeek))
+        binding.tvMonthProfit.text = CurrencyFormatter.format(profit(salesMonth))
+
         val topByProduct = sales.groupBy { it.productName }
             .map { (name, list) -> Triple(name, list.sumOf { it.quantity }, list.sumOf { it.total }) }
             .sortedByDescending { it.third }
@@ -92,12 +96,16 @@ class ReportsFragment : Fragment() {
         binding.recyclerViewTop.adapter = TopProductAdapter(topByProduct)
     }
 
+    /** Bénéfice = (prix de vente - prix d'achat) x quantité, pour une liste de ventes. */
+    private fun profit(sales: List<Sale>): Double =
+        sales.sumOf { (it.unitPrice - it.costPrice) * it.quantity }
+
     private fun paymentBreakdown(sales: List<Sale>): String {
         if (sales.isEmpty()) return "Aucune vente"
         val byMethod = sales.groupBy { it.paymentMethod }
         return listOf("Espèces", "Orange Money", "Wave").mapNotNull { method ->
             val total = byMethod[method]?.sumOf { it.total } ?: return@mapNotNull null
-            "$method: ${CurrencyFormatter.format(total)}"
+            "$method : ${CurrencyFormatter.format(total)}"
         }.joinToString("  •  ")
     }
 

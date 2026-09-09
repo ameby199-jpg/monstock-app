@@ -123,8 +123,9 @@ class StockFragment : Fragment() {
                 val name = dialogBinding.etName.text.toString().trim()
                 val qty = dialogBinding.etQuantity.text.toString().toLongOrNull() ?: 0L
                 val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: 0.0
+                val costPrice = dialogBinding.etCostPrice.text.toString().toDoubleOrNull() ?: 0.0
                 if (name.isNotEmpty()) {
-                    repo.addProduct(name, qty, price, pendingPhoto) { msg ->
+                    repo.addProduct(name, qty, price, costPrice, pendingPhoto) { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
