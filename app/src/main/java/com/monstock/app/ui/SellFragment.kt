@@ -69,6 +69,15 @@ class SellFragment : Fragment() {
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
+        dialogBinding.etQuantitySold.setText("1")
+        dialogBinding.btnMinus.setOnClickListener {
+            val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L
+            if (current > 1) dialogBinding.etQuantitySold.setText((current - 1).toString())
+        }
+        dialogBinding.btnPlus.setOnClickListener {
+            val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            if (current < product.quantity) dialogBinding.etQuantitySold.setText((current + 1).toString())
+        }
         AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)
@@ -80,9 +89,19 @@ class SellFragment : Fragment() {
                     else -> "Espèces"
                 }
                 if (qtySold in 1..product.quantity) {
-                    repo.recordSale(product, qtySold, paymentMethod) { msg ->
-                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                    }
+                    repo.recordSale(
+                        product, qtySold, paymentMethod,
+                        onError = { msg ->
+                            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                        },
+                        onSuccess = {
+                            android.widget.Toast.makeText(
+                                requireContext(),
+                                "✅ Vente réussie : ${product.name} x$qtySold",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    )
                 }
             }
             .setNegativeButton(R.string.cancel, null)

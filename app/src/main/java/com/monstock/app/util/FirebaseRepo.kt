@@ -115,7 +115,13 @@ class FirebaseRepo(private val shopCode: String) {
             }
     }
 
-    fun recordSale(product: Product, quantitySold: Long, paymentMethod: String, onError: (String) -> Unit = {}) {
+    fun recordSale(
+        product: Product,
+        quantitySold: Long,
+        paymentMethod: String,
+        onError: (String) -> Unit = {},
+        onSuccess: () -> Unit = {}
+    ) {
         val total = quantitySold * product.price
         val sale = hashMapOf(
             "productId" to product.id,
@@ -127,8 +133,21 @@ class FirebaseRepo(private val shopCode: String) {
             "paymentMethod" to paymentMethod
         )
         shopDoc().collection("sales").add(sale)
+            .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
         updateProductQuantity(product.id, product.quantity - quantitySold, onError)
+    }
+
+    fun resetSales(onError: (String) -> Unit = {}, onSuccess: () -> Unit = {}) {
+        shopDoc().collection("sales").get()
+            .addOnSuccessListener { snap ->
+                val batch = db.batch()
+                snap.documents.forEach { batch.delete(it.reference) }
+                batch.commit()
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la réinitialisation") }
+            }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la lecture des ventes") }
     }
 
     // ---------- Ingrédients / matières premières ----------

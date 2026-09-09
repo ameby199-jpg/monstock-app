@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@color/primary_dark"
+    android:paddingVertical="10dp">
+
+    <TextView
+        android:layout_width="120dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Nom des produits"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="95dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Prix (FCFA)"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="110dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Stock actuel"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="120dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Stock présent (auto)"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="100dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Achat du jour"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="120dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Dépensé (auto)"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="90dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Actions"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+</LinearLayout>

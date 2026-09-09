@@ -36,6 +36,19 @@ class ReportsFragment : Fragment() {
 
         binding.recyclerViewTop.layoutManager = LinearLayoutManager(requireContext())
 
+        binding.btnResetReports.setOnClickListener {
+            com.monstock.app.util.DeleteGuard.confirmDelete(requireContext(), "tout l'historique des ventes") {
+                repo.resetSales(
+                    onError = { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onSuccess = {
+                        android.widget.Toast.makeText(requireContext(), "✅ Rapports réinitialisés", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        }
+
         listener = repo.listenSales { sales -> updateStats(sales) }
     }
 

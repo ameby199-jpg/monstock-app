@@ -1,7 +1,6 @@
 package com.monstock.app.adapter
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.monstock.app.databinding.ItemIngredientBinding
@@ -24,21 +23,11 @@ class IngredientAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val ing = items[position]
         holder.binding.tvName.text = ing.name
-        holder.binding.tvPrice.text = "Prix: ${CurrencyFormatter.format(ing.price)}"
-        holder.binding.tvStockActuel.text = "Stock actuel: ${CurrencyFormatter.format(ing.stockActuel)}"
-
-        if (ing.achatDuJour != 0.0) {
-            holder.binding.tvStockPresent.visibility = View.VISIBLE
-            holder.binding.tvAchat.visibility = View.VISIBLE
-            holder.binding.tvDepense.visibility = View.VISIBLE
-            holder.binding.tvStockPresent.text = "Stock présent (auto): ${CurrencyFormatter.format(ing.stockPresent)}"
-            holder.binding.tvAchat.text = "Achat du jour: ${CurrencyFormatter.format(ing.achatDuJour)}"
-            holder.binding.tvDepense.text = "Dépensé du jour (auto): ${CurrencyFormatter.format(ing.depenseDuJour)}"
-        } else {
-            holder.binding.tvStockPresent.visibility = View.GONE
-            holder.binding.tvAchat.visibility = View.GONE
-            holder.binding.tvDepense.visibility = View.GONE
-        }
+        holder.binding.tvPrice.text = CurrencyFormatter.format(ing.price)
+        holder.binding.tvStockActuel.text = CurrencyFormatter.format(ing.stockActuel)
+        holder.binding.tvStockPresent.text = CurrencyFormatter.format(ing.stockPresent)
+        holder.binding.tvAchat.text = CurrencyFormatter.format(ing.achatDuJour)
+        holder.binding.tvDepense.text = CurrencyFormatter.format(ing.depenseDuJour)
 
         holder.binding.btnEdit.setOnClickListener { onEdit(ing) }
         holder.binding.btnDelete.setOnClickListener { onDelete(ing) }
