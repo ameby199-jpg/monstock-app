@@ -19,6 +19,8 @@ import com.monstock.app.databinding.DialogAddProductBinding
 import com.monstock.app.databinding.DialogSellBinding
 import com.monstock.app.databinding.FragmentStockBinding
 import com.monstock.app.model.Product
+import com.monstock.app.util.BackgroundPrefs
+import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 
@@ -45,6 +47,18 @@ class StockFragment : Fragment() {
             try {
                 val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
                 onPhotoPicked(bitmap)
+            } catch (e: Exception) {
+                // Ignoré : l'utilisateur peut réessayer
+            }
+        }
+    }
+
+    private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
+                BackgroundPrefs.saveCustomBackground(requireContext(), "stock", bitmap)
+                binding.ivBackground.setImageBitmap(bitmap)
             } catch (e: Exception) {
                 // Ignoré : l'utilisateur peut réessayer
             }
@@ -84,6 +98,9 @@ class StockFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val shopCode = ShopPrefs.getShopCode(requireContext()) ?: return
         repo = FirebaseRepo(shopCode)
+
+        BackgroundPrefs.applyBackground(requireContext(), "stock", binding.ivBackground)
+        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
 
         adapter = ProductAdapter(
             items = emptyList(),
@@ -138,6 +155,7 @@ class StockFragment : Fragment() {
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
+        dialogBinding.tvUnitPrice.text = "Prix : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L

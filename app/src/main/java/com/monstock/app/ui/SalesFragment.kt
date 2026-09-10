@@ -1,9 +1,12 @@
 package com.monstock.app.ui
 
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.firestore.ListenerRegistration
@@ -11,6 +14,7 @@ import com.monstock.app.adapter.SaleAdapter
 import com.monstock.app.adapter.SaleListItem
 import com.monstock.app.databinding.FragmentSalesBinding
 import com.monstock.app.model.Sale
+import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
@@ -25,6 +29,18 @@ class SalesFragment : Fragment() {
     private lateinit var adapter: SaleAdapter
     private var listener: ListenerRegistration? = null
 
+    private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
+                BackgroundPrefs.saveCustomBackground(requireContext(), "sales", bitmap)
+                binding.ivBackground.setImageBitmap(bitmap)
+            } catch (e: Exception) {
+                // Ignoré : l'utilisateur peut réessayer
+            }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -36,6 +52,9 @@ class SalesFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val shopCode = ShopPrefs.getShopCode(requireContext()) ?: return
         val repo = FirebaseRepo(shopCode)
+
+        BackgroundPrefs.applyBackground(requireContext(), "sales", binding.ivBackground)
+        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
 
         adapter = SaleAdapter(emptyList())
         binding.recyclerViewSales.layoutManager = LinearLayoutManager(requireContext())

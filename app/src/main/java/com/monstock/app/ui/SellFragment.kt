@@ -1,9 +1,12 @@
 package com.monstock.app.ui
 
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
@@ -14,6 +17,8 @@ import com.monstock.app.databinding.DialogSellBinding
 import com.monstock.app.databinding.FragmentSellBinding
 import com.monstock.app.model.Product
 import com.monstock.app.model.Sale
+import com.monstock.app.util.BackgroundPrefs
+import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 
@@ -29,6 +34,18 @@ class SellFragment : Fragment() {
     private var latestProducts: List<Product> = emptyList()
     private var salesCountByProductId: Map<String, Long> = emptyMap()
 
+    private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
+                BackgroundPrefs.saveCustomBackground(requireContext(), "home", bitmap)
+                binding.ivBackground.setImageBitmap(bitmap)
+            } catch (e: Exception) {
+                // Ignoré : l'utilisateur peut réessayer
+            }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -40,6 +57,9 @@ class SellFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val shopCode = ShopPrefs.getShopCode(requireContext()) ?: return
         repo = FirebaseRepo(shopCode)
+
+        BackgroundPrefs.applyBackground(requireContext(), "home", binding.ivBackground)
+        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
 
         adapter = SellProductAdapter(emptyList()) { showSellDialog(it) }
         binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
@@ -69,6 +89,7 @@ class SellFragment : Fragment() {
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
+        dialogBinding.tvUnitPrice.text = "Prix : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L

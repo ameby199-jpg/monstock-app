@@ -1,9 +1,12 @@
 package com.monstock.app.ui
 
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,6 +17,7 @@ import com.monstock.app.databinding.DialogAddIngredientBinding
 import com.monstock.app.databinding.DialogEditQuantityBinding
 import com.monstock.app.databinding.FragmentIngredientsBinding
 import com.monstock.app.model.Ingredient
+import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.DeleteGuard
 import com.monstock.app.util.FirebaseRepo
@@ -27,6 +31,18 @@ class IngredientsFragment : Fragment() {
     private lateinit var adapter: IngredientAdapter
     private var listener: ListenerRegistration? = null
 
+    private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
+                BackgroundPrefs.saveCustomBackground(requireContext(), "ingredients", bitmap)
+                binding.ivBackground.setImageBitmap(bitmap)
+            } catch (e: Exception) {
+                // Ignoré : l'utilisateur peut réessayer
+            }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -38,6 +54,9 @@ class IngredientsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val shopCode = ShopPrefs.getShopCode(requireContext()) ?: return
         repo = FirebaseRepo(shopCode)
+
+        BackgroundPrefs.applyBackground(requireContext(), "ingredients", binding.ivBackground)
+        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
 
         adapter = IngredientAdapter(
             items = emptyList(),
@@ -71,7 +90,7 @@ class IngredientsFragment : Fragment() {
         binding.tvTotalStock.text =
             "Stock actuel: ${CurrencyFormatter.format(totalStockActuel)}  •  Stock présent (auto): ${CurrencyFormatter.format(totalStockPresent)}"
         binding.tvTotalAchat.text =
-            "Achat du jour: ${CurrencyFormatter.format(totalAchat)}  •  Dépensé du jour (auto): ${CurrencyFormatter.format(totalAchat)}"
+            "Achat du jour: ${CurrencyFormatter.format(totalAchat)}  •  Dépensé (auto): ${CurrencyFormatter.format(totalAchat)}"
     }
 
     private fun showAddDialog() {
