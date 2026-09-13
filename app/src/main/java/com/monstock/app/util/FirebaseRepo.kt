@@ -5,12 +5,13 @@ import android.util.Base64
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.monstock.app.model.Ingredient
+import com.monstock.app.model.Order
 import com.monstock.app.model.Product
 import com.monstock.app.model.Sale
 import java.io.ByteArrayOutputStream
 
 /**
- * Toutes les données sont stockées sous /shops/{shopCode}/... : products, sales, ingredients.
+ * Toutes les données sont stockées sous /shops/{shopCode}/... : products, sales, ingredients, orders.
  * Ainsi, tous les appareils utilisant le même code boutique voient les mêmes données en direct.
  *
  * Les photos de produits sont enregistrées directement dans le document Firestore, sous forme
@@ -69,6 +70,30 @@ class FirebaseRepo(private val shopCode: String) {
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement") }
     }
 
+    /** Met à jour les informations d'un produit existant (nom, quantité, prix, prix d'achat, et photo si fournie). */
+    fun updateProduct(
+        productId: String,
+        name: String,
+        quantity: Long,
+        price: Double,
+        costPrice: Double,
+        photo: Bitmap? = null,
+        onError: (String) -> Unit = {}
+    ) {
+        val data = hashMapOf<String, Any>(
+            "name" to name,
+            "quantity" to quantity,
+            "price" to price,
+            "costPrice" to costPrice
+        )
+        if (photo != null) {
+            data["photoBase64"] = compressToBase64(photo)
+        }
+        shopDoc().collection("products").document(productId)
+            .update(data as Map<String, Any>)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
     fun updateProductPhoto(productId: String, photo: Bitmap, onError: (String) -> Unit = {}) {
         shopDoc().collection("products").document(productId)
             .update("photoBase64", compressToBase64(photo))
@@ -116,6 +141,7 @@ class FirebaseRepo(private val shopCode: String) {
                         total = d.getDouble("total") ?: 0.0,
                         timestamp = d.getLong("timestamp") ?: 0,
                         paymentMethod = d.getString("paymentMethod") ?: "Espèces",
+                        fromOrder = d.getBoolean("fromOrder") ?: false,
                         ownerId = shopCode
                     )
                 }
@@ -139,7 +165,8 @@ class FirebaseRepo(private val shopCode: String) {
             "costPrice" to product.costPrice,
             "total" to total,
             "timestamp" to System.currentTimeMillis(),
-            "paymentMethod" to paymentMethod
+            "paymentMethod" to paymentMethod,
+            "fromOrder" to false
         )
         shopDoc().collection("sales").add(sale)
             .addOnSuccessListener { onSuccess() }
@@ -157,6 +184,81 @@ class FirebaseRepo(private val shopCode: String) {
                     .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la réinitialisation") }
             }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la lecture des ventes") }
+    }
+
+    // ---------- Commandes ----------
+
+    fun listenOrders(onChange: (List<Order>) -> Unit): ListenerRegistration {
+        return shopDoc().collection("orders")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                val list = snap.documents.map { d ->
+                    Order(
+                        id = d.id,
+                        productId = d.getString("productId") ?: "",
+                        productName = d.getString("productName") ?: "",
+                        quantity = d.getLong("quantity") ?: 0,
+                        unitPrice = d.getDouble("unitPrice") ?: 0.0,
+                        costPrice = d.getDouble("costPrice") ?: 0.0,
+                        timestamp = d.getLong("timestamp") ?: 0
+                    )
+                }
+                onChange(list)
+            }
+    }
+
+    /** Enregistre une commande en attente (ne touche pas encore au stock ni aux ventes). */
+    fun addOrder(product: Product, quantity: Long, onError: (String) -> Unit = {}, onSuccess: () -> Unit = {}) {
+        val data = hashMapOf(
+            "productId" to product.id,
+            "productName" to product.name,
+            "quantity" to quantity,
+            "unitPrice" to product.price,
+            "costPrice" to product.costPrice,
+            "timestamp" to System.currentTimeMillis()
+        )
+        shopDoc().collection("orders").add(data)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la commande") }
+    }
+
+    /** Annule une commande en attente : elle est simplement retirée, sans impact sur le stock ni les ventes. */
+    fun cancelOrder(orderId: String, onError: (String) -> Unit = {}) {
+        shopDoc().collection("orders").document(orderId).delete()
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'annulation") }
+    }
+
+    /** Transforme une commande en vente réelle : enregistre la vente, déduit le stock, puis retire la commande. */
+    fun takeOrder(
+        order: Order,
+        paymentMethod: String = "Espèces",
+        onError: (String) -> Unit = {},
+        onSuccess: () -> Unit = {}
+    ) {
+        val total = order.quantity * order.unitPrice
+        val sale = hashMapOf(
+            "productId" to order.productId,
+            "productName" to order.productName,
+            "quantity" to order.quantity,
+            "unitPrice" to order.unitPrice,
+            "costPrice" to order.costPrice,
+            "total" to total,
+            "timestamp" to System.currentTimeMillis(),
+            "paymentMethod" to paymentMethod,
+            "fromOrder" to true
+        )
+        shopDoc().collection("sales").add(sale)
+            .addOnSuccessListener {
+                shopDoc().collection("products").document(order.productId).get()
+                    .addOnSuccessListener { doc ->
+                        val currentQty = doc.getLong("quantity") ?: 0
+                        updateProductQuantity(order.productId, currentQty - order.quantity, onError)
+                    }
+                shopDoc().collection("orders").document(order.id).delete()
+                onSuccess()
+            }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
     }
 
     // ---------- Ingrédients / matières premières ----------
