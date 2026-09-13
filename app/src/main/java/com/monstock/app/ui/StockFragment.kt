@@ -5,6 +5,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
@@ -205,8 +207,15 @@ class StockFragment : Fragment() {
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
-        dialogBinding.tvUnitPrice.text = "Prix : ${CurrencyFormatter.format(product.price)}"
+        dialogBinding.tvUnitPrice.text = "Prix unitaire : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
+
+        fun updateTotal() {
+            val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price)}"
+        }
+        updateTotal()
+
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L
             if (current > 1) dialogBinding.etQuantitySold.setText((current - 1).toString())
@@ -215,6 +224,12 @@ class StockFragment : Fragment() {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (current < product.quantity) dialogBinding.etQuantitySold.setText((current + 1).toString())
         }
+        dialogBinding.etQuantitySold.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) { updateTotal() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
         AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)

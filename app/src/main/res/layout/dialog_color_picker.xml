@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GridLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:columnCount="4"
+    android:padding="16dp">
+
+    <View android:id="@+id/swatchBlack" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#000000" />
+    <View android:id="@+id/swatchGray" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#666666" />
+    <View android:id="@+id/swatchBlue2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#1565C0" />
+    <View android:id="@+id/swatchGreen2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#2E7D32" />
+    <View android:id="@+id/swatchOrange2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#EF6C00" />
+    <View android:id="@+id/swatchPurple2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#6A1B9A" />
+    <View android:id="@+id/swatchRed2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#C62828" />
+    <View android:id="@+id/swatchTeal2" android:layout_width="56dp" android:layout_height="56dp" android:layout_margin="6dp" android:background="#00838F" />
+
+</GridLayout>

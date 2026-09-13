@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.monstock.app.R
 import com.monstock.app.databinding.ItemSellProductBinding
 import com.monstock.app.model.Product
+import com.monstock.app.util.CardStylePrefs
 import com.monstock.app.util.CurrencyFormatter
 
 class SellProductAdapter(
@@ -27,6 +28,10 @@ class SellProductAdapter(
         holder.binding.tvName.text = product.name
         holder.binding.tvDetails.text = "Qté: ${product.quantity}  •  ${CurrencyFormatter.format(product.price)}"
 
+        val context = holder.binding.root.context
+        holder.binding.tvName.setTextColor(CardStylePrefs.getNameColor(context))
+        holder.binding.tvDetails.setTextColor(CardStylePrefs.getPriceColor(context))
+
         val bitmap = decodePhoto(product.photoBase64)
         if (bitmap != null) {
             holder.binding.ivPhoto.setImageBitmap(bitmap)
@@ -41,6 +46,11 @@ class SellProductAdapter(
 
     fun updateData(newItems: List<Product>) {
         items = newItems
+        notifyDataSetChanged()
+    }
+
+    /** Force le réaffichage (utilisé après un changement de couleur dans les réglages). */
+    fun refresh() {
         notifyDataSetChanged()
     }
 

@@ -48,7 +48,12 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
                 val dateFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
                 val context = r.itemView.context
 
-                r.binding.tvSaleName.text = "${sale.productName} x${sale.quantity}"
+                // Les ventes issues d'une commande prise (⏰ -> Prendre) sont marquées ici.
+                r.binding.tvSaleName.text = if (sale.fromOrder) {
+                    "${sale.productName} x${sale.quantity}  🕑 Commande"
+                } else {
+                    "${sale.productName} x${sale.quantity}"
+                }
                 r.binding.tvSaleDetails.text =
                     "${CurrencyFormatter.format(sale.total)}  •  ${dateFmt.format(Date(sale.timestamp))}"
                 r.binding.tvSalePayment.text = sale.paymentMethod

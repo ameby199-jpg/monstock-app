@@ -1,8 +1,11 @@
 package com.monstock.app.ui
 
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,14 +18,17 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.monstock.app.R
 import com.monstock.app.adapter.OrderAdapter
 import com.monstock.app.adapter.SellProductAdapter
+import com.monstock.app.databinding.DialogColorPickerBinding
 import com.monstock.app.databinding.DialogOrdersBinding
 import com.monstock.app.databinding.DialogSellBinding
+import com.monstock.app.databinding.DialogSettingsBinding
 import com.monstock.app.databinding.DialogThemePickerBinding
 import com.monstock.app.databinding.FragmentSellBinding
 import com.monstock.app.model.Order
 import com.monstock.app.model.Product
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
+import com.monstock.app.util.CardStylePrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
@@ -41,6 +47,9 @@ class SellFragment : Fragment() {
     private var latestProducts: List<Product> = emptyList()
     private var salesCountByProductId: Map<String, Long> = emptyMap()
     private var latestOrders: List<Order> = emptyList()
+
+    // Tant que la fenêtre des commandes en attente est ouverte, on la tient à jour en direct.
+    private var ordersDialogAdapter: OrderAdapter? = null
 
     private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -67,8 +76,7 @@ class SellFragment : Fragment() {
         repo = FirebaseRepo(shopCode)
 
         BackgroundPrefs.applyBackground(requireContext(), "home", binding.ivBackground)
-        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
-        binding.btnTheme.setOnClickListener { showThemePickerDialog() }
+        binding.btnSettings.setOnClickListener { showSettingsDialog() }
 
         adapter = SellProductAdapter(emptyList()) { showSellDialog(it) }
         binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
@@ -92,6 +100,9 @@ class SellFragment : Fragment() {
                 binding.tvOrdersBadge.visibility = View.VISIBLE
                 binding.tvOrdersBadge.text = orders.size.toString()
             }
+            // Si la fenêtre des commandes est ouverte, on la met à jour tout de suite
+            // (sinon une commande "prise" ou "annulée" restait affichée jusqu'à réouverture).
+            ordersDialogAdapter?.updateData(orders)
         }
     }
 
@@ -109,8 +120,15 @@ class SellFragment : Fragment() {
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
-        dialogBinding.tvUnitPrice.text = "Prix : ${CurrencyFormatter.format(product.price)}"
+        dialogBinding.tvUnitPrice.text = "Prix unitaire : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
+
+        fun updateTotal() {
+            val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price)}"
+        }
+        updateTotal()
+
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L
             if (current > 1) dialogBinding.etQuantitySold.setText((current - 1).toString())
@@ -119,6 +137,12 @@ class SellFragment : Fragment() {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (current < product.quantity) dialogBinding.etQuantitySold.setText((current + 1).toString())
         }
+        dialogBinding.etQuantitySold.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) { updateTotal() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
         AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)
@@ -192,15 +216,51 @@ class SellFragment : Fragment() {
                 )
             }
         )
+        ordersDialogAdapter = ordersAdapter
         dialogBinding.recyclerViewOrders.layoutManager = LinearLayoutManager(requireContext())
         dialogBinding.recyclerViewOrders.adapter = ordersAdapter
         dialogBinding.tvOrdersEmpty.visibility = if (latestOrders.isEmpty()) View.VISIBLE else View.GONE
 
-        AlertDialog.Builder(requireContext())
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Commandes en attente")
             .setView(dialogBinding.root)
             .setNegativeButton("Fermer", null)
-            .show()
+            .create()
+        dialog.setOnDismissListener { ordersDialogAdapter = null }
+        dialog.show()
+    }
+
+    private fun showSettingsDialog() {
+        val dialogBinding = DialogSettingsBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Réglages")
+            .setView(dialogBinding.root)
+            .setNegativeButton("Fermer", null)
+            .create()
+
+        dialogBinding.optBackground.setOnClickListener {
+            dialog.dismiss()
+            pickBackground.launch("image/*")
+        }
+        dialogBinding.optTheme.setOnClickListener {
+            dialog.dismiss()
+            showThemePickerDialog()
+        }
+        dialogBinding.optNameColor.setOnClickListener {
+            dialog.dismiss()
+            showColorPickerDialog { color ->
+                CardStylePrefs.setNameColor(requireContext(), color)
+                adapter.refresh()
+            }
+        }
+        dialogBinding.optPriceColor.setOnClickListener {
+            dialog.dismiss()
+            showColorPickerDialog { color ->
+                CardStylePrefs.setPriceColor(requireContext(), color)
+                adapter.refresh()
+            }
+        }
+        dialog.show()
     }
 
     private fun showThemePickerDialog() {
@@ -229,11 +289,39 @@ class SellFragment : Fragment() {
         dialog.show()
     }
 
+    private fun showColorPickerDialog(onColorChosen: (Int) -> Unit) {
+        val dialogBinding = DialogColorPickerBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Choisir une couleur")
+            .setView(dialogBinding.root)
+            .setNegativeButton("Fermer", null)
+            .create()
+
+        val swatches = listOf(
+            dialogBinding.swatchBlack to Color.parseColor("#000000"),
+            dialogBinding.swatchGray to Color.parseColor("#666666"),
+            dialogBinding.swatchBlue2 to Color.parseColor("#1565C0"),
+            dialogBinding.swatchGreen2 to Color.parseColor("#2E7D32"),
+            dialogBinding.swatchOrange2 to Color.parseColor("#EF6C00"),
+            dialogBinding.swatchPurple2 to Color.parseColor("#6A1B9A"),
+            dialogBinding.swatchRed2 to Color.parseColor("#C62828"),
+            dialogBinding.swatchTeal2 to Color.parseColor("#00838F")
+        )
+        swatches.forEach { (view, color) ->
+            view.setOnClickListener {
+                onColorChosen(color)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         productsListener?.remove()
         salesListener?.remove()
         ordersListener?.remove()
+        ordersDialogAdapter = null
         _binding = null
     }
 }
