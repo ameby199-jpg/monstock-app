@@ -1,9 +1,11 @@
 package com.monstock.app.ui
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -112,7 +114,8 @@ class StockFragment : Fragment() {
                     }
                 }
             },
-            onPhoto = { showPhotoSourceChooser(it) }
+            onPhoto = { showPhotoSourceChooser(it) },
+            onEdit = { showEditDialog(it) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -150,6 +153,53 @@ class StockFragment : Fragment() {
             }
             .setNegativeButton(R.string.cancel) { _, _ -> dialogPreviewSetter = null }
             .show()
+    }
+
+    /** Modification d'un produit déjà existant : mêmes champs que l'ajout, pré-remplis. */
+    private fun showEditDialog(product: Product) {
+        pendingPhoto = null
+        val dialogBinding = DialogAddProductBinding.inflate(layoutInflater)
+        dialogBinding.etName.setText(product.name)
+        dialogBinding.etQuantity.setText(product.quantity.toString())
+        dialogBinding.etPrice.setText(product.price.toString())
+        dialogBinding.etCostPrice.setText(product.costPrice.toString())
+
+        val existingPhoto = decodeBase64Photo(product.photoBase64)
+        if (existingPhoto != null) {
+            Glide.with(dialogBinding.ivPhotoPreview).load(existingPhoto).centerCrop().into(dialogBinding.ivPhotoPreview)
+        }
+        dialogPreviewSetter = { bmp ->
+            Glide.with(dialogBinding.ivPhotoPreview).load(bmp).centerCrop().into(dialogBinding.ivPhotoPreview)
+        }
+        dialogBinding.btnAddPhoto.setOnClickListener { showPhotoSourceChooser(null) }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Modifier : ${product.name}")
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = dialogBinding.etName.text.toString().trim()
+                val qty = dialogBinding.etQuantity.text.toString().toLongOrNull() ?: product.quantity
+                val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: product.price
+                val costPrice = dialogBinding.etCostPrice.text.toString().toDoubleOrNull() ?: product.costPrice
+                if (name.isNotEmpty()) {
+                    repo.updateProduct(product.id, name, qty, price, costPrice, pendingPhoto) { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                dialogPreviewSetter = null
+            }
+            .setNegativeButton(R.string.cancel) { _, _ -> dialogPreviewSetter = null }
+            .show()
+    }
+
+    private fun decodeBase64Photo(base64: String): Bitmap? = try {
+        if (base64.isEmpty()) null
+        else {
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+    } catch (e: Exception) {
+        null
     }
 
     private fun showSellDialog(product: Product) {

@@ -59,7 +59,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="24sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary" />
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tvTodayBreakdown"
@@ -112,7 +112,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="24sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary" />
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tvWeekBreakdown"
@@ -165,7 +165,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="24sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary" />
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tvMonthBreakdown"

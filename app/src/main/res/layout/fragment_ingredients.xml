@@ -59,14 +59,14 @@
                 android:layout_gravity="bottom|end"
                 android:layout_margin="20dp"
                 android:src="@android:drawable/ic_input_add"
-                app:backgroundTint="@color/primary" />
+                app:backgroundTint="?attr/colorPrimary" />
 
         </FrameLayout>
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/primary"
+            app:cardBackgroundColor="?attr/colorPrimary"
             app:cardCornerRadius="0dp"
             app:cardElevation="4dp">
 

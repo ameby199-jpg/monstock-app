@@ -8,12 +8,14 @@ import com.monstock.app.ui.ReportsFragment
 import com.monstock.app.ui.SalesFragment
 import com.monstock.app.ui.SellFragment
 import com.monstock.app.ui.StockFragment
+import com.monstock.app.util.ThemePrefs
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(ThemePrefs.getSelectedTheme(this).styleRes)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)

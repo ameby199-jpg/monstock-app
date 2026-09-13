@@ -6,4 +6,34 @@
         <item name="colorAccent">@color/accent</item>
         <item name="android:windowBackground">@color/background</item>
     </style>
+
+    <style name="Theme.MonStock.Blue" parent="Theme.MonStock">
+        <item name="colorPrimary">#1565C0</item>
+        <item name="colorPrimaryDark">#0D47A1</item>
+    </style>
+
+    <style name="Theme.MonStock.Green" parent="Theme.MonStock">
+        <item name="colorPrimary">#2E7D32</item>
+        <item name="colorPrimaryDark">#1B5E20</item>
+    </style>
+
+    <style name="Theme.MonStock.Orange" parent="Theme.MonStock">
+        <item name="colorPrimary">#EF6C00</item>
+        <item name="colorPrimaryDark">#E65100</item>
+    </style>
+
+    <style name="Theme.MonStock.Purple" parent="Theme.MonStock">
+        <item name="colorPrimary">#6A1B9A</item>
+        <item name="colorPrimaryDark">#4A148C</item>
+    </style>
+
+    <style name="Theme.MonStock.Red" parent="Theme.MonStock">
+        <item name="colorPrimary">#C62828</item>
+        <item name="colorPrimaryDark">#8E0000</item>
+    </style>
+
+    <style name="Theme.MonStock.Teal" parent="Theme.MonStock">
+        <item name="colorPrimary">#00838F</item>
+        <item name="colorPrimaryDark">#006064</item>
+    </style>
 </resources>

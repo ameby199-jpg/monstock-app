@@ -14,7 +14,8 @@ class ProductAdapter(
     private var items: List<Product>,
     private val onSell: (Product) -> Unit,
     private val onDelete: (Product) -> Unit,
-    private val onPhoto: ((Product) -> Unit)? = null
+    private val onPhoto: ((Product) -> Unit)? = null,
+    private val onEdit: ((Product) -> Unit)? = null
 ) : RecyclerView.Adapter<ProductAdapter.VH>() {
 
     inner class VH(val binding: ItemProductBinding) : RecyclerView.ViewHolder(binding.root)
@@ -40,6 +41,9 @@ class ProductAdapter(
         holder.binding.btnDelete.setOnClickListener { onDelete(product) }
         if (onPhoto != null) {
             holder.binding.ivPhoto.setOnClickListener { onPhoto.invoke(product) }
+        }
+        if (onEdit != null) {
+            holder.binding.btnEdit.setOnClickListener { onEdit.invoke(product) }
         }
     }
 
