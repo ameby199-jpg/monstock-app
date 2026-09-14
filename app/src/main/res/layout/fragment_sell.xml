@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -30,32 +31,41 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:layout_margin="12dp">
+        android:layout_margin="14dp">
 
-        <TextView
-            android:id="@+id/btnOrders"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="#CCFFFFFF"
-            android:gravity="center"
-            android:text="⏰"
-            android:textSize="20sp" />
+        <androidx.cardview.widget.CardView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="#FFA000">
+
+            <TextView
+                android:id="@+id/btnOrders"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="⏰"
+                android:textSize="28sp" />
+        </androidx.cardview.widget.CardView>
 
         <TextView
             android:id="@+id/tvOrdersBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|end"
-            android:layout_marginTop="-4dp"
-            android:layout_marginEnd="-4dp"
-            android:background="@color/danger"
+            android:layout_marginTop="-6dp"
+            android:layout_marginEnd="-6dp"
+            android:background="@drawable/dot_shape"
+            android:backgroundTint="@color/danger"
             android:textColor="@color/white"
-            android:textSize="10sp"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:minWidth="18dp"
-            android:minHeight="18dp"
+            android:minWidth="24dp"
+            android:minHeight="24dp"
             android:gravity="center"
-            android:paddingHorizontal="4dp"
+            android:paddingHorizontal="6dp"
+            android:elevation="9dp"
             android:visibility="gone" />
 
     </FrameLayout>

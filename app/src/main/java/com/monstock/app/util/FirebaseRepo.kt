@@ -169,9 +169,9 @@ class FirebaseRepo(private val shopCode: String) {
             "fromOrder" to false
         )
         shopDoc().collection("sales").add(sale)
-            .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
         updateProductQuantity(product.id, product.quantity - quantitySold, onError)
+        onSuccess()
     }
 
     fun resetSales(onError: (String) -> Unit = {}, onSuccess: () -> Unit = {}) {
@@ -219,8 +219,8 @@ class FirebaseRepo(private val shopCode: String) {
             "timestamp" to System.currentTimeMillis()
         )
         shopDoc().collection("orders").add(data)
-            .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la commande") }
+        onSuccess()
     }
 
     /** Annule une commande en attente : elle est simplement retirée, sans impact sur le stock ni les ventes. */
@@ -229,9 +229,19 @@ class FirebaseRepo(private val shopCode: String) {
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'annulation") }
     }
 
-    /** Transforme une commande en vente réelle : enregistre la vente, déduit le stock, puis retire la commande. */
+    /**
+     * Transforme une commande en vente réelle : enregistre la vente, déduit le stock, et retire
+     * la commande de la liste d'attente.
+     *
+     * Les 3 écritures sont lancées indépendamment (pas imbriquées les unes dans les autres) afin
+     * que la commande disparaisse immédiatement de l'écran même sans connexion internet — Firestore
+     * applique les écritures au cache local tout de suite et les synchronise en arrière-plan dès
+     * que la connexion revient. [currentProductQuantity] doit venir des données déjà en mémoire
+     * (pas d'un nouvel appel réseau), pour que ça marche aussi hors ligne.
+     */
     fun takeOrder(
         order: Order,
+        currentProductQuantity: Long,
         paymentMethod: String = "Espèces",
         onError: (String) -> Unit = {},
         onSuccess: () -> Unit = {}
@@ -249,16 +259,14 @@ class FirebaseRepo(private val shopCode: String) {
             "fromOrder" to true
         )
         shopDoc().collection("sales").add(sale)
-            .addOnSuccessListener {
-                shopDoc().collection("products").document(order.productId).get()
-                    .addOnSuccessListener { doc ->
-                        val currentQty = doc.getLong("quantity") ?: 0
-                        updateProductQuantity(order.productId, currentQty - order.quantity, onError)
-                    }
-                shopDoc().collection("orders").document(order.id).delete()
-                onSuccess()
-            }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
+
+        updateProductQuantity(order.productId, currentProductQuantity - order.quantity, onError)
+
+        shopDoc().collection("orders").document(order.id).delete()
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression de la commande") }
+
+        onSuccess()
     }
 
     // ---------- Ingrédients / matières premières ----------

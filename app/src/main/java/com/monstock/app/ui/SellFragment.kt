@@ -180,7 +180,7 @@ class SellFragment : Fragment() {
                         onSuccess = {
                             android.widget.Toast.makeText(
                                 requireContext(),
-                                "🕑 Commande enregistrée : ${product.name} x$qtyOrdered",
+                                "✅ Commande enregistrée : ${product.name} x$qtyOrdered",
                                 android.widget.Toast.LENGTH_LONG
                             ).show()
                         }
@@ -199,17 +199,25 @@ class SellFragment : Fragment() {
                 repo.cancelOrder(order.id) { msg ->
                     android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                 }
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "✅ Commande annulée : ${order.productName}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             },
             onTake = { order ->
+                // La quantité vient des données déjà en mémoire (pas d'appel réseau) :
+                // ça marche donc même sans connexion, et la commande disparaît tout de suite.
+                val currentQty = latestProducts.firstOrNull { it.id == order.productId }?.quantity ?: 0L
                 repo.takeOrder(
-                    order,
+                    order, currentQty,
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
                     onSuccess = {
                         android.widget.Toast.makeText(
                             requireContext(),
-                            "✅ Commande vendue : ${order.productName} x${order.quantity}",
+                            "✅ Achat réalisé : ${order.productName} x${order.quantity}",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                     }
