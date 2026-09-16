@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.monstock.app.model.Ingredient
 import com.monstock.app.model.Order
+import com.monstock.app.model.OrderLine
 import com.monstock.app.model.Product
 import com.monstock.app.model.Sale
 import java.io.ByteArrayOutputStream
@@ -140,6 +141,7 @@ class FirebaseRepo(private val shopCode: String) {
                         costPrice = d.getDouble("costPrice") ?: 0.0,
                         total = d.getDouble("total") ?: 0.0,
                         timestamp = d.getLong("timestamp") ?: 0,
+                        orderTimestamp = d.getLong("orderTimestamp") ?: 0,
                         paymentMethod = d.getString("paymentMethod") ?: "Espèces",
                         fromOrder = d.getBoolean("fromOrder") ?: false,
                         ownerId = shopCode
@@ -187,6 +189,7 @@ class FirebaseRepo(private val shopCode: String) {
     }
 
     // ---------- Commandes ----------
+    // Une commande peut contenir plusieurs produits différents (panier).
 
     fun listenOrders(onChange: (List<Order>) -> Unit): ListenerRegistration {
         return shopDoc().collection("orders")
@@ -194,28 +197,36 @@ class FirebaseRepo(private val shopCode: String) {
             .addSnapshotListener { snap, error ->
                 if (error != null || snap == null) return@addSnapshotListener
                 val list = snap.documents.map { d ->
-                    Order(
-                        id = d.id,
-                        productId = d.getString("productId") ?: "",
-                        productName = d.getString("productName") ?: "",
-                        quantity = d.getLong("quantity") ?: 0,
-                        unitPrice = d.getDouble("unitPrice") ?: 0.0,
-                        costPrice = d.getDouble("costPrice") ?: 0.0,
-                        timestamp = d.getLong("timestamp") ?: 0
-                    )
+                    @Suppress("UNCHECKED_CAST")
+                    val rawItems = d.get("items") as? List<Map<String, Any>> ?: emptyList()
+                    val items = rawItems.map { m ->
+                        OrderLine(
+                            productId = m["productId"] as? String ?: "",
+                            productName = m["productName"] as? String ?: "",
+                            quantity = (m["quantity"] as? Number)?.toLong() ?: 0,
+                            unitPrice = (m["unitPrice"] as? Number)?.toDouble() ?: 0.0,
+                            costPrice = (m["costPrice"] as? Number)?.toDouble() ?: 0.0
+                        )
+                    }
+                    Order(id = d.id, items = items, timestamp = d.getLong("timestamp") ?: 0)
                 }
                 onChange(list)
             }
     }
 
-    /** Enregistre une commande en attente (ne touche pas encore au stock ni aux ventes). */
-    fun addOrder(product: Product, quantity: Long, onError: (String) -> Unit = {}, onSuccess: () -> Unit = {}) {
+    /** Enregistre une commande en attente pouvant contenir plusieurs produits (ne touche pas au stock). */
+    fun addOrder(items: List<OrderLine>, onError: (String) -> Unit = {}, onSuccess: () -> Unit = {}) {
+        val itemMaps = items.map { line ->
+            hashMapOf(
+                "productId" to line.productId,
+                "productName" to line.productName,
+                "quantity" to line.quantity,
+                "unitPrice" to line.unitPrice,
+                "costPrice" to line.costPrice
+            )
+        }
         val data = hashMapOf(
-            "productId" to product.id,
-            "productName" to product.name,
-            "quantity" to quantity,
-            "unitPrice" to product.price,
-            "costPrice" to product.costPrice,
+            "items" to itemMaps,
             "timestamp" to System.currentTimeMillis()
         )
         shopDoc().collection("orders").add(data)
@@ -230,38 +241,42 @@ class FirebaseRepo(private val shopCode: String) {
     }
 
     /**
-     * Transforme une commande en vente réelle : enregistre la vente, déduit le stock, et retire
-     * la commande de la liste d'attente.
+     * Transforme une commande (un ou plusieurs produits) en ventes réelles : une vente est créée
+     * par produit, avec l'heure de la commande ET l'heure de la prise en compte, le stock de
+     * chaque produit est déduit, puis la commande est retirée de la liste d'attente.
      *
-     * Les 3 écritures sont lancées indépendamment (pas imbriquées les unes dans les autres) afin
-     * que la commande disparaisse immédiatement de l'écran même sans connexion internet — Firestore
-     * applique les écritures au cache local tout de suite et les synchronise en arrière-plan dès
-     * que la connexion revient. [currentProductQuantity] doit venir des données déjà en mémoire
-     * (pas d'un nouvel appel réseau), pour que ça marche aussi hors ligne.
+     * [currentQuantities] doit venir des données déjà en mémoire (pas d'un nouvel appel réseau),
+     * et toutes les écritures sont indépendantes les unes des autres, pour que ça fonctionne
+     * immédiatement même sans connexion internet.
      */
     fun takeOrder(
         order: Order,
-        currentProductQuantity: Long,
+        currentQuantities: Map<String, Long>,
         paymentMethod: String = "Espèces",
         onError: (String) -> Unit = {},
         onSuccess: () -> Unit = {}
     ) {
-        val total = order.quantity * order.unitPrice
-        val sale = hashMapOf(
-            "productId" to order.productId,
-            "productName" to order.productName,
-            "quantity" to order.quantity,
-            "unitPrice" to order.unitPrice,
-            "costPrice" to order.costPrice,
-            "total" to total,
-            "timestamp" to System.currentTimeMillis(),
-            "paymentMethod" to paymentMethod,
-            "fromOrder" to true
-        )
-        shopDoc().collection("sales").add(sale)
-            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
+        val now = System.currentTimeMillis()
+        order.items.forEach { line ->
+            val total = line.quantity * line.unitPrice
+            val sale = hashMapOf(
+                "productId" to line.productId,
+                "productName" to line.productName,
+                "quantity" to line.quantity,
+                "unitPrice" to line.unitPrice,
+                "costPrice" to line.costPrice,
+                "total" to total,
+                "timestamp" to now,
+                "orderTimestamp" to order.timestamp,
+                "paymentMethod" to paymentMethod,
+                "fromOrder" to true
+            )
+            shopDoc().collection("sales").add(sale)
+                .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
 
-        updateProductQuantity(order.productId, currentProductQuantity - order.quantity, onError)
+            val current = currentQuantities[line.productId] ?: 0L
+            updateProductQuantity(line.productId, current - line.quantity, onError)
+        }
 
         shopDoc().collection("orders").document(order.id).delete()
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression de la commande") }

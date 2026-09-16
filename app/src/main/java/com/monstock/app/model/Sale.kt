@@ -9,6 +9,9 @@ data class Sale(
     var costPrice: Double = 0.0,
     var total: Double = 0.0,
     var timestamp: Long = 0,
+    // Pour une vente issue d'une commande : heure à laquelle la commande a été passée
+    // (timestamp = heure à laquelle elle a été prise / vendue).
+    var orderTimestamp: Long = 0,
     var paymentMethod: String = "Espèces",
     var fromOrder: Boolean = false,
     var ownerId: String = ""

@@ -45,7 +45,7 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
             is SaleListItem.Row -> {
                 val r = holder as RowVH
                 val sale = item.sale
-                val dateFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
+                val timeFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
                 val context = r.itemView.context
 
                 // Les ventes issues d'une commande prise (⏰ -> Prendre) sont marquées ici.
@@ -54,8 +54,12 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
                 } else {
                     "${sale.productName} x${sale.quantity}"
                 }
-                r.binding.tvSaleDetails.text =
-                    "${CurrencyFormatter.format(sale.total)}  •  ${dateFmt.format(Date(sale.timestamp))}"
+
+                r.binding.tvSaleDetails.text = if (sale.fromOrder && sale.orderTimestamp > 0) {
+                    "${CurrencyFormatter.format(sale.total)}  •  Commandé: ${timeFmt.format(Date(sale.orderTimestamp))}  •  Prise: ${timeFmt.format(Date(sale.timestamp))}"
+                } else {
+                    "${CurrencyFormatter.format(sale.total)}  •  ${timeFmt.format(Date(sale.timestamp))}"
+                }
                 r.binding.tvSalePayment.text = sale.paymentMethod
 
                 val colorRes = when (sale.paymentMethod) {

@@ -9,6 +9,8 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -18,6 +20,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.monstock.app.R
 import com.monstock.app.adapter.OrderAdapter
 import com.monstock.app.adapter.SellProductAdapter
+import com.monstock.app.databinding.DialogCartBinding
 import com.monstock.app.databinding.DialogColorPickerBinding
 import com.monstock.app.databinding.DialogOrdersBinding
 import com.monstock.app.databinding.DialogSellBinding
@@ -25,12 +28,14 @@ import com.monstock.app.databinding.DialogSettingsBinding
 import com.monstock.app.databinding.DialogThemePickerBinding
 import com.monstock.app.databinding.FragmentSellBinding
 import com.monstock.app.model.Order
+import com.monstock.app.model.OrderLine
 import com.monstock.app.model.Product
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CardStylePrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.FirebaseRepo
+import com.monstock.app.util.OrderButtonPrefs
 import com.monstock.app.util.ShopPrefs
 import com.monstock.app.util.ThemePrefs
 
@@ -47,6 +52,10 @@ class SellFragment : Fragment() {
     private var latestProducts: List<Product> = emptyList()
     private var salesCountByProductId: Map<String, Long> = emptyMap()
     private var latestOrders: List<Order> = emptyList()
+
+    // Panier en cours de construction : plusieurs produits peuvent être ajoutés avant de
+    // valider la commande en une seule fois.
+    private val draftCart = mutableListOf<OrderLine>()
 
     // Tant que la fenêtre des commandes en attente est ouverte, on la tient à jour en direct.
     private var ordersDialogAdapter: OrderAdapter? = null
@@ -76,7 +85,10 @@ class SellFragment : Fragment() {
         repo = FirebaseRepo(shopCode)
 
         BackgroundPrefs.applyBackground(requireContext(), "home", binding.ivBackground)
+        binding.cardOrders.setCardBackgroundColor(OrderButtonPrefs.getColor(requireContext()))
         binding.btnSettings.setOnClickListener { showSettingsDialog() }
+        binding.btnValidateCart.setOnClickListener { showCartDialog() }
+        updateCartButton()
 
         adapter = SellProductAdapter(emptyList()) { showSellDialog(it) }
         binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
@@ -115,6 +127,16 @@ class SellFragment : Fragment() {
         )
         adapter.updateData(sorted)
         binding.tvEmpty.visibility = if (sorted.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun updateCartButton() {
+        if (draftCart.isEmpty()) {
+            binding.btnValidateCart.visibility = View.GONE
+        } else {
+            val total = draftCart.sumOf { it.unitPrice * it.quantity }
+            binding.btnValidateCart.text = "🛒 Valider (${draftCart.size}) — ${CurrencyFormatter.format(total)}"
+            binding.btnValidateCart.visibility = View.VISIBLE
+        }
     }
 
     private fun showSellDialog(product: Product) {
@@ -169,25 +191,77 @@ class SellFragment : Fragment() {
                     )
                 }
             }
-            .setNeutralButton("Commande") { _, _ ->
-                val qtyOrdered = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-                if (qtyOrdered in 1..product.quantity) {
-                    repo.addOrder(
-                        product, qtyOrdered,
-                        onError = { msg ->
-                            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                        },
-                        onSuccess = {
-                            android.widget.Toast.makeText(
-                                requireContext(),
-                                "✅ Commande enregistrée : ${product.name} x$qtyOrdered",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    )
+            .setNeutralButton("Ajouter au panier") { _, _ ->
+                val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+                if (qty in 1..product.quantity) {
+                    draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice))
+                    updateCartButton()
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "🛒 Ajouté au panier : ${product.name} x$qty",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** Résumé du panier en cours : un ou plusieurs produits, à valider en une seule commande. */
+    private fun showCartDialog() {
+        val dialogBinding = DialogCartBinding.inflate(layoutInflater)
+        dialogBinding.llCartItems.removeAllViews()
+        draftCart.forEach { line ->
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            val nameView = TextView(requireContext()).apply {
+                text = "${line.productName} x${line.quantity}"
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val priceView = TextView(requireContext()).apply {
+                text = CurrencyFormatter.format(line.unitPrice * line.quantity)
+                textSize = 15f
+                setTextColor(Color.parseColor("#666666"))
+            }
+            row.addView(nameView)
+            row.addView(priceView)
+            dialogBinding.llCartItems.addView(row)
+        }
+        val total = draftCart.sumOf { it.unitPrice * it.quantity }
+        dialogBinding.tvCartTotal.text = "Total : ${CurrencyFormatter.format(total)}"
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Commande en cours")
+            .setView(dialogBinding.root)
+            .setPositiveButton("Valider la commande") { _, _ ->
+                val itemsToSend = draftCart.toList()
+                repo.addOrder(
+                    itemsToSend,
+                    onError = { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onSuccess = {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "✅ Commande envoyée (${itemsToSend.size} article(s))",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+                draftCart.clear()
+                updateCartButton()
+            }
+            .setNegativeButton("Vider le panier") { _, _ ->
+                draftCart.clear()
+                updateCartButton()
+            }
+            .setNeutralButton("Continuer les achats", null)
             .show()
     }
 
@@ -201,23 +275,26 @@ class SellFragment : Fragment() {
                 }
                 android.widget.Toast.makeText(
                     requireContext(),
-                    "✅ Commande annulée : ${order.productName}",
+                    "✅ Commande annulée",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             },
             onTake = { order ->
-                // La quantité vient des données déjà en mémoire (pas d'appel réseau) :
+                // Les quantités viennent des données déjà en mémoire (pas d'appel réseau) :
                 // ça marche donc même sans connexion, et la commande disparaît tout de suite.
-                val currentQty = latestProducts.firstOrNull { it.id == order.productId }?.quantity ?: 0L
+                val quantities = order.items.associate { line ->
+                    line.productId to (latestProducts.firstOrNull { it.id == line.productId }?.quantity ?: 0L)
+                }
                 repo.takeOrder(
-                    order, currentQty,
+                    order, quantities,
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
                     onSuccess = {
+                        val summary = order.items.joinToString(", ") { "${it.productName} x${it.quantity}" }
                         android.widget.Toast.makeText(
                             requireContext(),
-                            "✅ Achat réalisé : ${order.productName} x${order.quantity}",
+                            "✅ Achat réalisé : $summary",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                     }
@@ -266,6 +343,13 @@ class SellFragment : Fragment() {
             showColorPickerDialog { color ->
                 CardStylePrefs.setPriceColor(requireContext(), color)
                 adapter.refresh()
+            }
+        }
+        dialogBinding.optOrdersColor.setOnClickListener {
+            dialog.dismiss()
+            showColorPickerDialog { color ->
+                OrderButtonPrefs.setColor(requireContext(), color)
+                binding.cardOrders.setCardBackgroundColor(color)
             }
         }
         dialog.show()

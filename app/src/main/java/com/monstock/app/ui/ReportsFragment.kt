@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -25,6 +26,7 @@ class ReportsFragment : Fragment() {
     private var _binding: FragmentReportsBinding? = null
     private val binding get() = _binding!!
     private var listener: ListenerRegistration? = null
+    private var latestSalesToday: List<Sale> = emptyList()
 
     private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -68,7 +70,28 @@ class ReportsFragment : Fragment() {
             }
         }
 
+        binding.btnEndDay.setOnClickListener { showEndDayConfirmation() }
+
         listener = repo.listenSales { sales -> updateStats(sales) }
+    }
+
+    /** Affiche un résumé de la journée (CA + bénéfice), sans rien supprimer ni modifier. */
+    private fun showEndDayConfirmation() {
+        val revenue = latestSalesToday.sumOf { it.total }
+        val profit = profit(latestSalesToday)
+        val count = latestSalesToday.size
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Terminer la journée ?")
+            .setMessage(
+                "Résumé du jour :\n\n" +
+                    "Ventes : $count\n" +
+                    "Chiffre d'affaires : ${CurrencyFormatter.format(revenue)}\n" +
+                    "Bénéfice : ${CurrencyFormatter.format(profit)}\n\n" +
+                    "Rien ne sera supprimé, ceci est juste un récapitulatif."
+            )
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun updateStats(sales: List<Sale>) {
@@ -94,6 +117,7 @@ class ReportsFragment : Fragment() {
         val salesToday = sales.filter { it.timestamp >= startOfDay }
         val salesWeek = sales.filter { it.timestamp >= startOfWeek }
         val salesMonth = sales.filter { it.timestamp >= startOfMonth }
+        latestSalesToday = salesToday
 
         binding.tvToday.text = CurrencyFormatter.format(salesToday.sumOf { it.total })
         binding.tvWeek.text = CurrencyFormatter.format(salesWeek.sumOf { it.total })
@@ -102,6 +126,10 @@ class ReportsFragment : Fragment() {
         binding.tvTodayBreakdown.text = paymentBreakdown(salesToday)
         binding.tvWeekBreakdown.text = paymentBreakdown(salesWeek)
         binding.tvMonthBreakdown.text = paymentBreakdown(salesMonth)
+
+        binding.tvTodayOrdersSplit.text = ordersSplit(salesToday)
+        binding.tvWeekOrdersSplit.text = ordersSplit(salesWeek)
+        binding.tvMonthOrdersSplit.text = ordersSplit(salesMonth)
 
         binding.tvTodayProfit.text = CurrencyFormatter.format(profit(salesToday))
         binding.tvWeekProfit.text = CurrencyFormatter.format(profit(salesWeek))
@@ -118,6 +146,14 @@ class ReportsFragment : Fragment() {
     /** Bénéfice = (prix de vente - prix d'achat) x quantité, pour une liste de ventes. */
     private fun profit(sales: List<Sale>): Double =
         sales.sumOf { (it.unitPrice - it.costPrice) * it.quantity }
+
+    /** Répartition ventes directes / issues d'une commande ⏰, pour une liste de ventes. */
+    private fun ordersSplit(sales: List<Sale>): String {
+        if (sales.isEmpty()) return ""
+        val direct = sales.filter { !it.fromOrder }.sumOf { it.total }
+        val fromOrders = sales.filter { it.fromOrder }.sumOf { it.total }
+        return "🛒 Ventes directes : ${CurrencyFormatter.format(direct)}  •  🕑 Via commande : ${CurrencyFormatter.format(fromOrders)}"
+    }
 
     private fun paymentBreakdown(sales: List<Sale>): String {
         if (sales.isEmpty()) return "Aucune vente"
