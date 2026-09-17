@@ -209,6 +209,9 @@ class StockFragment : Fragment() {
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
         dialogBinding.tvUnitPrice.text = "Prix unitaire : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
+        // Stock ne propose pas la commande/panier (reserve a l'Accueil) : boutons masques.
+        dialogBinding.btnOrderSingle.visibility = View.GONE
+        dialogBinding.btnAddToCart.visibility = View.GONE
 
         fun updateTotal() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L

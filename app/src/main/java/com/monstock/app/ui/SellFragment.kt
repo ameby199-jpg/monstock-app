@@ -139,6 +139,13 @@ class SellFragment : Fragment() {
         }
     }
 
+    /**
+     * Fenêtre de vente d'un produit. Deux façons de le mettre en attente plutôt que de le vendre
+     * tout de suite :
+     * - 🕑 Commande : ce produit seul est envoyé directement dans la liste d'attente ⏰.
+     * - 🛒 Panier : ce produit rejoint le panier en cours, pour former une commande à plusieurs
+     *   produits une fois que le client a fini de choisir (bouton 🛒 flottant en bas).
+     */
     private fun showSellDialog(product: Product) {
         val dialogBinding = DialogSellBinding.inflate(layoutInflater)
         dialogBinding.tvAvailableStock.text = "En stock : ${product.quantity} unité(s)"
@@ -165,7 +172,7 @@ class SellFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
-        AlertDialog.Builder(requireContext())
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.sell) { _, _ ->
@@ -191,20 +198,46 @@ class SellFragment : Fragment() {
                     )
                 }
             }
-            .setNeutralButton("🛒 Ajouter au panier") { _, _ ->
-                val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-                if (qty in 1..product.quantity) {
-                    draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice))
-                    updateCartButton()
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        "🛒 Ajouté au panier : ${product.name} x$qty",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+
+        // Commande simple : un seul produit, envoyé directement dans la liste d'attente ⏰.
+        dialogBinding.btnOrderSingle.setOnClickListener {
+            val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            if (qty in 1..product.quantity) {
+                repo.addOrder(
+                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice)),
+                    onError = { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onSuccess = {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "✅ Commande enregistrée : ${product.name} x$qty",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+                dialog.dismiss()
+            }
+        }
+
+        // Panier : ce produit rejoint une commande à plusieurs produits, à valider plus tard.
+        dialogBinding.btnAddToCart.setOnClickListener {
+            val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            if (qty in 1..product.quantity) {
+                draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice))
+                updateCartButton()
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "🛒 Ajouté au panier : ${product.name} x$qty",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
     }
 
     /** Résumé du panier en cours : un ou plusieurs produits, à valider en une seule commande. */
