@@ -191,7 +191,7 @@ class SellFragment : Fragment() {
                     )
                 }
             }
-            .setNeutralButton("Ajouter au panier") { _, _ ->
+            .setNeutralButton("🛒 Ajouter au panier") { _, _ ->
                 val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
                 if (qty in 1..product.quantity) {
                     draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice))
