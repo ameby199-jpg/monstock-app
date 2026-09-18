@@ -233,34 +233,38 @@ class StockFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
-        AlertDialog.Builder(requireContext())
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)
-            .setPositiveButton(R.string.sell) { _, _ ->
-                val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-                val paymentMethod = when (dialogBinding.rgPayment.checkedRadioButtonId) {
-                    dialogBinding.rbOrangeMoney.id -> "Orange Money"
-                    dialogBinding.rbWave.id -> "Wave"
-                    else -> "Espèces"
-                }
-                if (qtySold in 1..product.quantity) {
-                    repo.recordSale(
-                        product, qtySold, paymentMethod,
-                        onError = { msg ->
-                            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                        },
-                        onSuccess = {
-                            android.widget.Toast.makeText(
-                                requireContext(),
-                                "✅ Vente réussie : ${product.name} x$qtySold",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    )
-                }
-            }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+
+        dialogBinding.btnSellNow.setOnClickListener {
+            val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            val paymentMethod = when (dialogBinding.rgPayment.checkedRadioButtonId) {
+                dialogBinding.rbOrangeMoney.id -> "Orange Money"
+                dialogBinding.rbWave.id -> "Wave"
+                else -> "Espèces"
+            }
+            if (qtySold in 1..product.quantity) {
+                repo.recordSale(
+                    product, qtySold, paymentMethod,
+                    onError = { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onSuccess = {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "✅ Vente réussie : ${product.name} x$qtySold",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
     }
 
     override fun onDestroyView() {

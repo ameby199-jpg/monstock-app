@@ -16,28 +16,10 @@
         android:textSize="12sp" />
 
     <TextView
-        android:layout_width="95dp"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="8dp"
-        android:text="Prix (FCFA)"
-        android:textColor="@color/white"
-        android:textStyle="bold"
-        android:textSize="12sp" />
-
-    <TextView
         android:layout_width="110dp"
         android:layout_height="wrap_content"
         android:paddingHorizontal="8dp"
         android:text="Stock actuel"
-        android:textColor="@color/white"
-        android:textStyle="bold"
-        android:textSize="12sp" />
-
-    <TextView
-        android:layout_width="120dp"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="8dp"
-        android:text="Stock présent (auto)"
         android:textColor="@color/white"
         android:textStyle="bold"
         android:textSize="12sp" />
@@ -55,7 +37,16 @@
         android:layout_width="120dp"
         android:layout_height="wrap_content"
         android:paddingHorizontal="8dp"
-        android:text="Dépensé (auto)"
+        android:text="Chiffres (auto)"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="110dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:text="Nouveau stock"
         android:textColor="@color/white"
         android:textStyle="bold"
         android:textSize="12sp" />

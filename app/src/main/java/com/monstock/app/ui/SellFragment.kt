@@ -140,8 +140,8 @@ class SellFragment : Fragment() {
     }
 
     /**
-     * Fenêtre de vente d'un produit. Deux façons de le mettre en attente plutôt que de le vendre
-     * tout de suite :
+     * Fenêtre de vente d'un produit. Le gros bouton ✅ VENDRE conclut la vente tout de suite.
+     * Deux façons de le mettre en attente plutôt que de le vendre tout de suite :
      * - 🕑 Commande : ce produit seul est envoyé directement dans la liste d'attente ⏰.
      * - 🛒 Panier : ce produit rejoint le panier en cours, pour former une commande à plusieurs
      *   produits une fois que le client a fini de choisir (bouton 🛒 flottant en bas).
@@ -175,31 +175,33 @@ class SellFragment : Fragment() {
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Vendre : ${product.name}")
             .setView(dialogBinding.root)
-            .setPositiveButton(R.string.sell) { _, _ ->
-                val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-                val paymentMethod = when (dialogBinding.rgPayment.checkedRadioButtonId) {
-                    dialogBinding.rbOrangeMoney.id -> "Orange Money"
-                    dialogBinding.rbWave.id -> "Wave"
-                    else -> "Espèces"
-                }
-                if (qtySold in 1..product.quantity) {
-                    repo.recordSale(
-                        product, qtySold, paymentMethod,
-                        onError = { msg ->
-                            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                        },
-                        onSuccess = {
-                            android.widget.Toast.makeText(
-                                requireContext(),
-                                "✅ Vente réussie : ${product.name} x$qtySold",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    )
-                }
-            }
             .setNegativeButton(R.string.cancel, null)
             .create()
+
+        dialogBinding.btnSellNow.setOnClickListener {
+            val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
+            val paymentMethod = when (dialogBinding.rgPayment.checkedRadioButtonId) {
+                dialogBinding.rbOrangeMoney.id -> "Orange Money"
+                dialogBinding.rbWave.id -> "Wave"
+                else -> "Espèces"
+            }
+            if (qtySold in 1..product.quantity) {
+                repo.recordSale(
+                    product, qtySold, paymentMethod,
+                    onError = { msg ->
+                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onSuccess = {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "✅ Vente réussie : ${product.name} x$qtySold",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+                dialog.dismiss()
+            }
+        }
 
         // Commande simple : un seul produit, envoyé directement dans la liste d'attente ⏰.
         dialogBinding.btnOrderSingle.setOnClickListener {

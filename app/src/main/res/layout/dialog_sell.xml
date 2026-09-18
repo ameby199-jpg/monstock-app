@@ -110,11 +110,22 @@
 
     </RadioGroup>
 
+    <Button
+        android:id="@+id/btnSellNow"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="18dp"
+        android:text="✅  VENDRE"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/accent" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="16dp">
+        android:layout_marginTop="10dp">
 
         <Button
             android:id="@+id/btnOrderSingle"
@@ -133,7 +144,7 @@
             android:layout_weight="1"
             android:text="🛒 Panier"
             android:textSize="13sp"
-            android:backgroundTint="@color/accent" />
+            android:backgroundTint="#9E9E9E" />
 
     </LinearLayout>
 

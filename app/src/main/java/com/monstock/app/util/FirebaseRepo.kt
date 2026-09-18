@@ -291,12 +291,16 @@ class FirebaseRepo(private val shopCode: String) {
             .addSnapshotListener { snap, error ->
                 if (error != null || snap == null) return@addSnapshotListener
                 val list = snap.documents.map { d ->
+                    val stockActuel = d.getDouble("stockActuel") ?: 0.0
                     Ingredient(
                         id = d.id,
                         name = d.getString("name") ?: "",
                         price = d.getDouble("price") ?: 0.0,
-                        stockActuel = d.getDouble("stockActuel") ?: 0.0,
+                        stockActuel = stockActuel,
                         achatDuJour = d.getDouble("achatDuJour") ?: 0.0,
+                        // Si jamais renseigné (anciens ingrédients), on part du stock actuel :
+                        // Chiffres affiche alors 0 au lieu d'un faux écart.
+                        nouveauStock = d.getDouble("nouveauStock") ?: stockActuel,
                         ownerId = shopCode
                     )
                 }
@@ -309,7 +313,8 @@ class FirebaseRepo(private val shopCode: String) {
             "name" to name,
             "price" to price,
             "stockActuel" to stockActuel,
-            "achatDuJour" to 0.0
+            "achatDuJour" to 0.0,
+            "nouveauStock" to stockActuel
         )
         shopDoc().collection("ingredients").add(data)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement") }
@@ -330,6 +335,13 @@ class FirebaseRepo(private val shopCode: String) {
         )
         shopDoc().collection("ingredients").document(ingredientId)
             .update(data)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
+    /** Mise à jour rapide de la seule colonne "Nouveau stock" (appui direct dans le tableau). */
+    fun updateNouveauStock(ingredientId: String, nouveauStock: Double, onError: (String) -> Unit = {}) {
+        shopDoc().collection("ingredients").document(ingredientId)
+            .update("nouveauStock", nouveauStock)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
     }
 
