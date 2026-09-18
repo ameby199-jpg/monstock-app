@@ -17,6 +17,7 @@ import com.monstock.app.databinding.ItemSaleBinding
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
+import com.monstock.app.util.DayPrefs
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 import java.util.Calendar
@@ -75,7 +76,11 @@ class ReportsFragment : Fragment() {
         listener = repo.listenSales { sales -> updateStats(sales) }
     }
 
-    /** Affiche un résumé de la journée (CA + bénéfice), sans rien supprimer ni modifier. */
+    /**
+     * Affiche un résumé de la journée en cours (CA + bénéfice), sans rien supprimer.
+     * En validant, la journée suivante repart de maintenant plutôt que de minuit — utile
+     * pour qui termine tard sans que ses ventes se retrouvent coupées entre deux jours.
+     */
     private fun showEndDayConfirmation() {
         val revenue = latestSalesToday.sumOf { it.total }
         val profit = profit(latestSalesToday)
@@ -88,19 +93,26 @@ class ReportsFragment : Fragment() {
                     "Ventes : $count\n" +
                     "Chiffre d'affaires : ${CurrencyFormatter.format(revenue)}\n" +
                     "Bénéfice : ${CurrencyFormatter.format(profit)}\n\n" +
-                    "Rien ne sera supprimé, ceci est juste un récapitulatif."
+                    "Rien ne sera supprimé. La prochaine journée commencera à partir de maintenant."
             )
-            .setPositiveButton("OK", null)
+            .setPositiveButton("Terminer") { _, _ ->
+                DayPrefs.startNewDay(requireContext())
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "✅ Journée terminée — la nouvelle journée commence maintenant",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+            .setNegativeButton("Annuler", null)
             .show()
     }
 
     private fun updateStats(sales: List<Sale>) {
         val now = Calendar.getInstance()
 
-        val startOfDay = Calendar.getInstance().apply {
-            timeInMillis = now.timeInMillis
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
-        }.timeInMillis
+        // "Aujourd'hui" part de la dernière fois où l'utilisateur a terminé sa journée,
+        // pas forcément de minuit — voir DayPrefs.
+        val startOfDay = DayPrefs.getDayStart(requireContext())
 
         val startOfWeek = Calendar.getInstance().apply {
             timeInMillis = now.timeInMillis
