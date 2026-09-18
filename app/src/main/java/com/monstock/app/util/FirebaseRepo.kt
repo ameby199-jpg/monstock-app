@@ -345,6 +345,20 @@ class FirebaseRepo(private val shopCode: String) {
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
     }
 
+    /** Mise à jour rapide de la seule colonne "Stock actuel" (appui direct dans le tableau). */
+    fun updateStockActuel(ingredientId: String, stockActuel: Double, onError: (String) -> Unit = {}) {
+        shopDoc().collection("ingredients").document(ingredientId)
+            .update("stockActuel", stockActuel)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
+    /** Mise à jour rapide de la seule colonne "Achat du jour" (appui direct dans le tableau). */
+    fun updateAchatDuJour(ingredientId: String, achatDuJour: Double, onError: (String) -> Unit = {}) {
+        shopDoc().collection("ingredients").document(ingredientId)
+            .update("achatDuJour", achatDuJour)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
     fun deleteIngredient(ingredientId: String, onError: (String) -> Unit = {}) {
         shopDoc().collection("ingredients").document(ingredientId).delete()
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression") }

@@ -13,6 +13,8 @@ class IngredientAdapter(
     private var items: List<Ingredient>,
     private val onEdit: (Ingredient) -> Unit,
     private val onDelete: (Ingredient) -> Unit,
+    private val onEditStockActuel: (Ingredient) -> Unit,
+    private val onEditAchat: (Ingredient) -> Unit,
     private val onEditNouveauStock: (Ingredient) -> Unit
 ) : RecyclerView.Adapter<IngredientAdapter.VH>() {
 
@@ -40,7 +42,11 @@ class IngredientAdapter(
             holder.binding.tvChiffres.setTextColor(Color.parseColor("#C62828"))
         }
 
+        // Un simple appui sur chacune de ces 3 colonnes ouvre son édition rapide.
+        holder.binding.tvStockActuel.setOnClickListener { onEditStockActuel(ing) }
+        holder.binding.tvAchat.setOnClickListener { onEditAchat(ing) }
         holder.binding.tvNouveauStock.setOnClickListener { onEditNouveauStock(ing) }
+
         holder.binding.btnEdit.setOnClickListener { onEdit(ing) }
         holder.binding.btnDelete.setOnClickListener { onDelete(ing) }
     }

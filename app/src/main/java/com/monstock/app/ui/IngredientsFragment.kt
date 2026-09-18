@@ -71,7 +71,24 @@ class IngredientsFragment : Fragment() {
                     }
                 }
             },
-            onEditNouveauStock = { showEditNouveauStockDialog(it) }
+            onEditStockActuel = { ingredient ->
+                showQuickEditDialog(
+                    title = "Stock actuel : ${ingredient.name}",
+                    currentValue = ingredient.stockActuel
+                ) { value -> repo.updateStockActuel(ingredient.id, value) { msg -> toastError(msg) } }
+            },
+            onEditAchat = { ingredient ->
+                showQuickEditDialog(
+                    title = "Achat du jour : ${ingredient.name}",
+                    currentValue = ingredient.achatDuJour
+                ) { value -> repo.updateAchatDuJour(ingredient.id, value) { msg -> toastError(msg) } }
+            },
+            onEditNouveauStock = { ingredient ->
+                showQuickEditDialog(
+                    title = "Nouveau stock : ${ingredient.name}",
+                    currentValue = ingredient.nouveauStock
+                ) { value -> repo.updateNouveauStock(ingredient.id, value) { msg -> toastError(msg) } }
+            }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -83,6 +100,10 @@ class IngredientsFragment : Fragment() {
             binding.tvEmpty.visibility = if (ingredients.isEmpty()) View.VISIBLE else View.GONE
             updateTotals(ingredients)
         }
+    }
+
+    private fun toastError(msg: String) {
+        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
     }
 
     /** Totaux automatiques en bas du tableau, comme dans Excel. */
@@ -115,9 +136,7 @@ class IngredientsFragment : Fragment() {
                 val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: 0.0
                 val stockActuel = dialogBinding.etStockActuel.text.toString().toDoubleOrNull() ?: 0.0
                 if (name.isNotEmpty()) {
-                    repo.addIngredient(name, price, stockActuel) { msg ->
-                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                    }
+                    repo.addIngredient(name, price, stockActuel) { msg -> toastError(msg) }
                 }
             }
             .setNegativeButton(R.string.cancel, null)
@@ -136,30 +155,26 @@ class IngredientsFragment : Fragment() {
                 val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: ingredient.price
                 val stockActuel = dialogBinding.etStockActuel.text.toString().toDoubleOrNull() ?: ingredient.stockActuel
                 val achat = dialogBinding.etAchatDuJour.text.toString().toDoubleOrNull() ?: 0.0
-                repo.updateIngredient(ingredient.id, price, stockActuel, achat) { msg ->
-                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                }
+                repo.updateIngredient(ingredient.id, price, stockActuel, achat) { msg -> toastError(msg) }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
-    /** Édition rapide en appuyant directement sur la colonne "Nouveau stock" du tableau. */
-    private fun showEditNouveauStockDialog(ingredient: Ingredient) {
+    /** Édition rapide en appuyant directement sur une colonne du tableau (Stock actuel, Achat du jour, Nouveau stock). */
+    private fun showQuickEditDialog(title: String, currentValue: Double, onSave: (Double) -> Unit) {
         val input = EditText(requireContext())
         input.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-        input.setText(ingredient.nouveauStock.toString())
+        input.setText(currentValue.toString())
         val padding = (16 * resources.displayMetrics.density).toInt()
         input.setPadding(padding, padding, padding, padding)
 
         AlertDialog.Builder(requireContext())
-            .setTitle("Nouveau stock : ${ingredient.name}")
+            .setTitle(title)
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->
-                val value = input.text.toString().toDoubleOrNull() ?: ingredient.nouveauStock
-                repo.updateNouveauStock(ingredient.id, value) { msg ->
-                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                }
+                val value = input.text.toString().toDoubleOrNull() ?: currentValue
+                onSave(value)
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
