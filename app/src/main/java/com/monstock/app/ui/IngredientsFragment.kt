@@ -1,14 +1,11 @@
 package com.monstock.app.ui
 
-import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,7 +16,6 @@ import com.monstock.app.databinding.DialogAddIngredientBinding
 import com.monstock.app.databinding.DialogEditQuantityBinding
 import com.monstock.app.databinding.FragmentIngredientsBinding
 import com.monstock.app.model.Ingredient
-import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.DeleteGuard
 import com.monstock.app.util.FirebaseRepo
@@ -34,17 +30,8 @@ class IngredientsFragment : Fragment() {
     private lateinit var adapter: IngredientAdapter
     private var listener: ListenerRegistration? = null
 
-    private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri)
-                BackgroundPrefs.saveCustomBackground(requireContext(), "ingredients", bitmap)
-                binding.ivBackground.setImageBitmap(bitmap)
-            } catch (e: Exception) {
-                // Ignoré : l'utilisateur peut réessayer
-            }
-        }
-    }
+    // Liste la plus récente reçue du listener, utilisée par le bouton ⛓️ pour reporter les stocks.
+    private var currentIngredients: List<Ingredient> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -58,8 +45,7 @@ class IngredientsFragment : Fragment() {
         val shopCode = ShopPrefs.getShopCode(requireContext()) ?: return
         repo = FirebaseRepo(shopCode)
 
-        BackgroundPrefs.applyBackground(requireContext(), "ingredients", binding.ivBackground)
-        binding.btnChangeBackground.setOnClickListener { pickBackground.launch("image/*") }
+        binding.btnValidateStock.setOnClickListener { confirmValidateAllStocks() }
 
         adapter = IngredientAdapter(
             items = emptyList(),
@@ -96,10 +82,31 @@ class IngredientsFragment : Fragment() {
         binding.fabAdd.setOnClickListener { showAddDialog() }
 
         listener = repo.listenIngredients { ingredients ->
+            currentIngredients = ingredients
             adapter.updateData(ingredients)
             binding.tvEmpty.visibility = if (ingredients.isEmpty()) View.VISIBLE else View.GONE
             updateTotals(ingredients)
         }
+    }
+
+    /**
+     * Bouton ⛓️ : reporte "Nouveau stock" dans "Stock actuel" pour tous les produits,
+     * puis remet "Nouveau stock" et "Achat du jour" à zéro. Action groupée et irréversible,
+     * donc confirmation obligatoire avant de l'appliquer.
+     */
+    private fun confirmValidateAllStocks() {
+        if (currentIngredients.isEmpty()) return
+        AlertDialog.Builder(requireContext())
+            .setTitle("Reporter le nouveau stock ?")
+            .setMessage(
+                "Pour chaque produit : le \"Nouveau stock\" remplacera le \"Stock actuel\", " +
+                    "puis \"Nouveau stock\" et \"Achat du jour\" repasseront à 0.\n\nCette action ne peut pas être annulée."
+            )
+            .setPositiveButton("Valider") { _, _ ->
+                repo.validateAllStocks(currentIngredients) { msg -> toastError(msg) }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun toastError(msg: String) {

@@ -363,4 +363,24 @@ class FirebaseRepo(private val shopCode: String) {
         shopDoc().collection("ingredients").document(ingredientId).delete()
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression") }
     }
+
+    /**
+     * Bouton ⛓️ : pour chaque ingrédient, "Nouveau stock" devient le "Stock actuel",
+     * puis "Nouveau stock" et "Achat du jour" repartent à 0.
+     * Utilise un batch Firestore pour appliquer le changement à tous les produits d'un coup.
+     */
+    fun validateAllStocks(ingredients: List<Ingredient>, onError: (String) -> Unit = {}) {
+        val batch = db.batch()
+        val collection = shopDoc().collection("ingredients")
+        for (ing in ingredients) {
+            val data = mapOf(
+                "stockActuel" to ing.nouveauStock,
+                "nouveauStock" to 0.0,
+                "achatDuJour" to 0.0
+            )
+            batch.update(collection.document(ing.id), data)
+        }
+        batch.commit()
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
 }
