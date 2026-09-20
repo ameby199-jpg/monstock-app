@@ -117,7 +117,8 @@ class StockFragment : Fragment() {
                 }
             },
             onPhoto = { showPhotoSourceChooser(it) },
-            onEdit = { showEditDialog(it) }
+            onEdit = { showEditDialog(it) },
+            onEditComposants = { showComposantsDialog(it) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -128,6 +129,28 @@ class StockFragment : Fragment() {
             adapter.updateData(products)
             binding.tvEmpty.visibility = if (products.isEmpty()) View.VISIBLE else View.GONE
         }
+    }
+
+    /** Note libre "Composants" (ex: pain, viande, fromage...) éditable en appuyant sur la ligne dans Stock. */
+    private fun showComposantsDialog(product: Product) {
+        val input = android.widget.EditText(requireContext())
+        input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        input.setText(product.composants)
+        input.setLines(3)
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(padding, padding, padding, padding)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Composants : ${product.name}")
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val value = input.text.toString().trim()
+                repo.updateProductComposants(product.id, value) { msg ->
+                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun showAddDialog() {

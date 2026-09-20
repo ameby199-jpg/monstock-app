@@ -16,7 +16,8 @@ class ProductAdapter(
     private val onSell: (Product) -> Unit,
     private val onDelete: (Product) -> Unit,
     private val onPhoto: ((Product) -> Unit)? = null,
-    private val onEdit: ((Product) -> Unit)? = null
+    private val onEdit: ((Product) -> Unit)? = null,
+    private val onEditComposants: ((Product) -> Unit)? = null
 ) : RecyclerView.Adapter<ProductAdapter.VH>() {
 
     inner class VH(val binding: ItemProductBinding) : RecyclerView.ViewHolder(binding.root)
@@ -30,6 +31,14 @@ class ProductAdapter(
         val product = items[position]
         holder.binding.tvName.text = product.name
         holder.binding.tvDetails.text = "Qté: ${product.quantity}  •  ${CurrencyFormatter.format(product.price)}"
+        holder.binding.tvComposants.text = if (product.composants.isBlank()) {
+            "Composants : appuyer pour renseigner"
+        } else {
+            "Composants : ${product.composants}"
+        }
+        if (onEditComposants != null) {
+            holder.binding.tvComposants.setOnClickListener { onEditComposants.invoke(product) }
+        }
 
         val context = holder.binding.root.context
         holder.binding.tvName.setTextColor(CardStylePrefs.getNameColor(context))

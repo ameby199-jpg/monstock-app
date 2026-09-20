@@ -4,7 +4,10 @@ import android.graphics.Bitmap
 import android.util.Base64
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import com.monstock.app.model.Ingredient
+import com.monstock.app.model.IngredientHistoryEntry
+import com.monstock.app.model.IngredientHistoryItem
 import com.monstock.app.model.Order
 import com.monstock.app.model.OrderLine
 import com.monstock.app.model.Product
@@ -43,6 +46,7 @@ class FirebaseRepo(private val shopCode: String) {
                         price = d.getDouble("price") ?: 0.0,
                         costPrice = d.getDouble("costPrice") ?: 0.0,
                         photoBase64 = d.getString("photoBase64") ?: "",
+                        composants = d.getString("composants") ?: "",
                         ownerId = shopCode
                     )
                 }
@@ -116,6 +120,13 @@ class FirebaseRepo(private val shopCode: String) {
     fun updateProductQuantity(productId: String, newQuantity: Long, onError: (String) -> Unit = {}) {
         shopDoc().collection("products").document(productId)
             .update("quantity", newQuantity)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
+    /** Mise à jour rapide de la note "Composants" (appui direct sur la ligne dans Stock). */
+    fun updateProductComposants(productId: String, composants: String, onError: (String) -> Unit = {}) {
+        shopDoc().collection("products").document(productId)
+            .update("composants", composants)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
     }
 
@@ -367,11 +378,27 @@ class FirebaseRepo(private val shopCode: String) {
     /**
      * Bouton ⛓️ : pour chaque ingrédient, "Nouveau stock" devient le "Stock actuel",
      * puis "Nouveau stock" et "Achat du jour" repartent à 0.
-     * Utilise un batch Firestore pour appliquer le changement à tous les produits d'un coup.
+     * Avant ce reset, l'état du jour (stock actuel / achat du jour / nouveau stock de chaque
+     * produit) est enregistré dans l'historique (bouton 💾), consultable à tout moment.
+     * Utilise un batch Firestore pour appliquer tout ça d'un coup.
      */
     fun validateAllStocks(ingredients: List<Ingredient>, onError: (String) -> Unit = {}) {
         val batch = db.batch()
         val collection = shopDoc().collection("ingredients")
+
+        // 1) Enregistrement de la photo du jour dans l'historique, avant tout changement.
+        val itemsData = ingredients.map { ing ->
+            hashMapOf(
+                "name" to ing.name,
+                "stockActuel" to ing.stockActuel,
+                "achatDuJour" to ing.achatDuJour,
+                "nouveauStock" to ing.nouveauStock
+            )
+        }
+        val historyDoc = shopDoc().collection("ingredientHistory").document()
+        batch.set(historyDoc, hashMapOf("timestamp" to System.currentTimeMillis(), "items" to itemsData))
+
+        // 2) Report du nouveau stock vers le stock actuel, puis remise à zéro.
         for (ing in ingredients) {
             val data = mapOf(
                 "stockActuel" to ing.nouveauStock,
@@ -382,5 +409,30 @@ class FirebaseRepo(private val shopCode: String) {
         }
         batch.commit()
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
+    /** Liste des journées enregistrées via le bouton ⛓️, de la plus récente à la plus ancienne. */
+    fun getIngredientHistory(onResult: (List<IngredientHistoryEntry>) -> Unit, onError: (String) -> Unit = {}) {
+        shopDoc().collection("ingredientHistory")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.map { d ->
+                    val timestamp = d.getLong("timestamp") ?: 0L
+                    @Suppress("UNCHECKED_CAST")
+                    val itemsRaw = d.get("items") as? List<Map<String, Any>> ?: emptyList()
+                    val items = itemsRaw.map { m ->
+                        IngredientHistoryItem(
+                            name = m["name"] as? String ?: "",
+                            stockActuel = (m["stockActuel"] as? Number)?.toDouble() ?: 0.0,
+                            achatDuJour = (m["achatDuJour"] as? Number)?.toDouble() ?: 0.0,
+                            nouveauStock = (m["nouveauStock"] as? Number)?.toDouble() ?: 0.0
+                        )
+                    }
+                    IngredientHistoryEntry(id = d.id, timestamp = timestamp, items = items)
+                }
+                onResult(list)
+            }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec du chargement de l'historique") }
     }
 }
