@@ -28,6 +28,12 @@ class ReportsFragment : Fragment() {
     private val binding get() = _binding!!
     private var listener: ListenerRegistration? = null
     private var latestSalesToday: List<Sale> = emptyList()
+    private var latestSalesWeek: List<Sale> = emptyList()
+    private var latestSalesMonth: List<Sale> = emptyList()
+
+    // Bénéfices masqués par défaut ; il faut le code pour les révéler, à chaque ouverture de l'écran.
+    private var profitVisible = false
+    private val profitPasscode = "1234"
 
     private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -73,7 +79,52 @@ class ReportsFragment : Fragment() {
 
         binding.btnEndDay.setOnClickListener { showEndDayConfirmation() }
 
+        val profitClick = View.OnClickListener { toggleProfitVisibility() }
+        binding.tvTodayProfit.setOnClickListener(profitClick)
+        binding.tvWeekProfit.setOnClickListener(profitClick)
+        binding.tvMonthProfit.setOnClickListener(profitClick)
+
         listener = repo.listenSales { sales -> updateStats(sales) }
+    }
+
+    /** Bénéfices masqués par "🔒 Appuyer pour afficher" ; un appui demande le code pour les révéler. */
+    private fun toggleProfitVisibility() {
+        if (profitVisible) {
+            profitVisible = false
+            renderProfits()
+            return
+        }
+        val input = android.widget.EditText(requireContext())
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(padding, padding, padding, padding)
+        AlertDialog.Builder(requireContext())
+            .setTitle("Code requis")
+            .setMessage("Entrer le code pour afficher les bénéfices.")
+            .setView(input)
+            .setPositiveButton("Valider") { _, _ ->
+                if (input.text.toString() == profitPasscode) {
+                    profitVisible = true
+                    renderProfits()
+                } else {
+                    android.widget.Toast.makeText(requireContext(), "Code incorrect", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    private fun renderProfits() {
+        if (profitVisible) {
+            binding.tvTodayProfit.text = CurrencyFormatter.format(profit(latestSalesToday))
+            binding.tvWeekProfit.text = CurrencyFormatter.format(profit(latestSalesWeek))
+            binding.tvMonthProfit.text = CurrencyFormatter.format(profit(latestSalesMonth))
+        } else {
+            val hidden = "🔒 Appuyer pour afficher"
+            binding.tvTodayProfit.text = hidden
+            binding.tvWeekProfit.text = hidden
+            binding.tvMonthProfit.text = hidden
+        }
     }
 
     /**
@@ -130,6 +181,8 @@ class ReportsFragment : Fragment() {
         val salesWeek = sales.filter { it.timestamp >= startOfWeek }
         val salesMonth = sales.filter { it.timestamp >= startOfMonth }
         latestSalesToday = salesToday
+        latestSalesWeek = salesWeek
+        latestSalesMonth = salesMonth
 
         binding.tvToday.text = CurrencyFormatter.format(salesToday.sumOf { it.total })
         binding.tvWeek.text = CurrencyFormatter.format(salesWeek.sumOf { it.total })
@@ -143,14 +196,12 @@ class ReportsFragment : Fragment() {
         binding.tvWeekOrdersSplit.text = ordersSplit(salesWeek)
         binding.tvMonthOrdersSplit.text = ordersSplit(salesMonth)
 
-        binding.tvTodayProfit.text = CurrencyFormatter.format(profit(salesToday))
-        binding.tvWeekProfit.text = CurrencyFormatter.format(profit(salesWeek))
-        binding.tvMonthProfit.text = CurrencyFormatter.format(profit(salesMonth))
+        renderProfits()
 
-        val topByProduct = sales.groupBy { it.productName }
+        // Tous les produits vendus AUJOURD'HUI (et non l'historique complet), du plus vendu au moins vendu.
+        val topByProduct = salesToday.groupBy { it.productName }
             .map { (name, list) -> Triple(name, list.sumOf { it.quantity }, list.sumOf { it.total }) }
             .sortedByDescending { it.third }
-            .take(10)
 
         binding.recyclerViewTop.adapter = TopProductAdapter(topByProduct)
     }
