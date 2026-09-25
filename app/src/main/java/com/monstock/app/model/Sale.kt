@@ -14,5 +14,6 @@ data class Sale(
     var orderTimestamp: Long = 0,
     var paymentMethod: String = "Espèces",
     var fromOrder: Boolean = false,
+    var employeeName: String = "",
     var ownerId: String = ""
 )

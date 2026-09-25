@@ -34,6 +34,7 @@ import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CardStylePrefs
 import com.monstock.app.util.CurrencyFormatter
+import com.monstock.app.util.EmployeeSession
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.OrderButtonPrefs
 import com.monstock.app.util.ShopPrefs
@@ -188,6 +189,7 @@ class SellFragment : Fragment() {
             if (qtySold in 1..product.quantity) {
                 repo.recordSale(
                     product, qtySold, paymentMethod,
+                    employeeName = EmployeeSession.getCurrentName(requireContext()),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
@@ -322,6 +324,7 @@ class SellFragment : Fragment() {
                 }
                 repo.takeOrder(
                     order, quantities,
+                    employeeName = EmployeeSession.getCurrentName(requireContext()),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },

@@ -5,6 +5,7 @@ import android.util.Base64
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.monstock.app.model.Employee
 import com.monstock.app.model.Ingredient
 import com.monstock.app.model.IngredientHistoryEntry
 import com.monstock.app.model.IngredientHistoryItem
@@ -155,6 +156,7 @@ class FirebaseRepo(private val shopCode: String) {
                         orderTimestamp = d.getLong("orderTimestamp") ?: 0,
                         paymentMethod = d.getString("paymentMethod") ?: "Espèces",
                         fromOrder = d.getBoolean("fromOrder") ?: false,
+                        employeeName = d.getString("employeeName") ?: "",
                         ownerId = shopCode
                     )
                 }
@@ -166,6 +168,7 @@ class FirebaseRepo(private val shopCode: String) {
         product: Product,
         quantitySold: Long,
         paymentMethod: String,
+        employeeName: String = "",
         onError: (String) -> Unit = {},
         onSuccess: () -> Unit = {}
     ) {
@@ -179,7 +182,8 @@ class FirebaseRepo(private val shopCode: String) {
             "total" to total,
             "timestamp" to System.currentTimeMillis(),
             "paymentMethod" to paymentMethod,
-            "fromOrder" to false
+            "fromOrder" to false,
+            "employeeName" to employeeName
         )
         shopDoc().collection("sales").add(sale)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
@@ -264,6 +268,7 @@ class FirebaseRepo(private val shopCode: String) {
         order: Order,
         currentQuantities: Map<String, Long>,
         paymentMethod: String = "Espèces",
+        employeeName: String = "",
         onError: (String) -> Unit = {},
         onSuccess: () -> Unit = {}
     ) {
@@ -280,7 +285,8 @@ class FirebaseRepo(private val shopCode: String) {
                 "timestamp" to now,
                 "orderTimestamp" to order.timestamp,
                 "paymentMethod" to paymentMethod,
-                "fromOrder" to true
+                "fromOrder" to true,
+                "employeeName" to employeeName
             )
             shopDoc().collection("sales").add(sale)
                 .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
@@ -434,5 +440,57 @@ class FirebaseRepo(private val shopCode: String) {
                 onResult(list)
             }
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec du chargement de l'historique") }
+    }
+
+    // ---------- Employés (connexion par code personnel) ----------
+
+    fun listenEmployees(onChange: (List<Employee>) -> Unit): ListenerRegistration {
+        return shopDoc().collection("employees")
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                val list = snap.documents.map { d ->
+                    Employee(
+                        id = d.id,
+                        name = d.getString("name") ?: "",
+                        code = d.getString("code") ?: "",
+                        role = d.getString("role") ?: "employe"
+                    )
+                }
+                onChange(list.sortedBy { it.name.lowercase() })
+            }
+    }
+
+    /** Lecture unique (pas de listener) : utilisée pour vérifier le code au moment de la connexion. */
+    fun getEmployeesOnce(onResult: (List<Employee>) -> Unit, onError: (String) -> Unit = {}) {
+        shopDoc().collection("employees").get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.map { d ->
+                    Employee(
+                        id = d.id,
+                        name = d.getString("name") ?: "",
+                        code = d.getString("code") ?: "",
+                        role = d.getString("role") ?: "employe"
+                    )
+                }
+                onResult(list)
+            }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la connexion") }
+    }
+
+    fun addEmployee(name: String, code: String, role: String, onError: (String) -> Unit = {}) {
+        val data = hashMapOf("name" to name, "code" to code, "role" to role)
+        shopDoc().collection("employees").add(data)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement") }
+    }
+
+    fun updateEmployee(employeeId: String, name: String, code: String, role: String, onError: (String) -> Unit = {}) {
+        val data = mapOf("name" to name, "code" to code, "role" to role)
+        shopDoc().collection("employees").document(employeeId).update(data)
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la mise à jour") }
+    }
+
+    fun deleteEmployee(employeeId: String, onError: (String) -> Unit = {}) {
+        shopDoc().collection("employees").document(employeeId).delete()
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression") }
     }
 }

@@ -12,12 +12,16 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.firestore.ListenerRegistration
+import com.monstock.app.MainActivity
+import com.monstock.app.databinding.DialogEmployeesBinding
 import com.monstock.app.databinding.FragmentReportsBinding
 import com.monstock.app.databinding.ItemSaleBinding
+import com.monstock.app.model.Employee
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.DayPrefs
+import com.monstock.app.util.EmployeeSession
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 import java.util.Calendar
@@ -78,6 +82,12 @@ class ReportsFragment : Fragment() {
         }
 
         binding.btnEndDay.setOnClickListener { showEndDayConfirmation() }
+
+        binding.btnLogout.setOnClickListener { logout() }
+        if (EmployeeSession.isResponsable(requireContext())) {
+            binding.btnManageEmployees.visibility = View.VISIBLE
+            binding.btnManageEmployees.setOnClickListener { showEmployeesDialog(repo) }
+        }
 
         val profitClick = View.OnClickListener { toggleProfitVisibility() }
         binding.tvTodayProfit.setOnClickListener(profitClick)
@@ -153,6 +163,124 @@ class ReportsFragment : Fragment() {
                     "✅ Journée terminée — la nouvelle journée commence maintenant",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    /** Redemande le code à la prochaine ouverture, pour qu'un autre employé puisse se connecter. */
+    private fun logout() {
+        EmployeeSession.logout(requireContext())
+        val intent = android.content.Intent(requireActivity(), MainActivity::class.java)
+        intent.flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
+        requireActivity().finish()
+    }
+
+    /** Réservé au responsable : liste des employés, avec ajout/modification/suppression de leur code. */
+    private fun showEmployeesDialog(repo: FirebaseRepo) {
+        repo.getEmployeesOnce(
+            onResult = { employees -> renderEmployeesDialog(repo, employees) },
+            onError = { msg -> android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show() }
+        )
+    }
+
+    private fun renderEmployeesDialog(repo: FirebaseRepo, employees: List<Employee>) {
+        val dialogBinding = DialogEmployeesBinding.inflate(layoutInflater)
+        dialogBinding.llEmployeesList.removeAllViews()
+
+        employees.forEach { employee ->
+            val row = android.widget.LinearLayout(requireContext()).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                val margin = (6 * resources.displayMetrics.density).toInt()
+                setPadding(margin, margin, margin, margin)
+            }
+            val info = android.widget.TextView(requireContext()).apply {
+                text = "${employee.name}${if (employee.isResponsable) "  👑" else ""}"
+                textSize = 15f
+                layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val editBtn = android.widget.TextView(requireContext()).apply {
+                text = "✏️"
+                textSize = 18f
+                setPadding(24, 0, 24, 0)
+                setOnClickListener { showAddEditEmployeeDialog(repo, employee) }
+            }
+            val deleteBtn = android.widget.TextView(requireContext()).apply {
+                text = "🗑"
+                textSize = 18f
+                setOnClickListener {
+                    com.monstock.app.util.DeleteGuard.confirmDelete(requireContext(), employee.name) {
+                        repo.deleteEmployee(employee.id) { msg ->
+                            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            row.addView(info)
+            row.addView(editBtn)
+            row.addView(deleteBtn)
+            dialogBinding.llEmployeesList.addView(row)
+        }
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Employés")
+            .setView(dialogBinding.root)
+            .setNegativeButton("Fermer", null)
+            .create()
+
+        dialogBinding.btnAddEmployeeRow.setOnClickListener {
+            dialog.dismiss()
+            showAddEditEmployeeDialog(repo, null)
+        }
+        dialog.show()
+    }
+
+    /** [employee] null = ajout ; sinon modification de son nom / code / rôle. */
+    private fun showAddEditEmployeeDialog(repo: FirebaseRepo, employee: Employee?) {
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+        }
+        val nameInput = android.widget.EditText(requireContext()).apply {
+            hint = "Nom"
+            setText(employee?.name ?: "")
+        }
+        val codeInput = android.widget.EditText(requireContext()).apply {
+            hint = "Code"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(employee?.code ?: "")
+        }
+        val responsableCheck = android.widget.CheckBox(requireContext()).apply {
+            text = "Responsable (peut gérer les employés)"
+            isChecked = employee?.isResponsable ?: false
+        }
+        container.addView(nameInput)
+        container.addView(codeInput)
+        container.addView(responsableCheck)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(if (employee == null) "Ajouter un employé" else "Modifier : ${employee.name}")
+            .setView(container)
+            .setPositiveButton("Enregistrer") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val code = codeInput.text.toString().trim()
+                val role = if (responsableCheck.isChecked) "responsable" else "employe"
+                if (name.isEmpty() || code.isEmpty()) return@setPositiveButton
+                val onError: (String) -> Unit = { msg ->
+                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                }
+                if (employee == null) {
+                    repo.addEmployee(name, code, role, onError)
+                } else {
+                    repo.updateEmployee(employee.id, name, code, role, onError)
+                }
             }
             .setNegativeButton("Annuler", null)
             .show()

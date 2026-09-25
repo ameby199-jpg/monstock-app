@@ -25,6 +25,7 @@ import com.monstock.app.databinding.FragmentStockBinding
 import com.monstock.app.model.Product
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.CurrencyFormatter
+import com.monstock.app.util.EmployeeSession
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 
@@ -272,6 +273,7 @@ class StockFragment : Fragment() {
             if (qtySold in 1..product.quantity) {
                 repo.recordSale(
                     product, qtySold, paymentMethod,
+                    employeeName = EmployeeSession.getCurrentName(requireContext()),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },

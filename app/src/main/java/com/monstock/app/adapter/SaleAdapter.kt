@@ -56,9 +56,9 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
                 }
 
                 r.binding.tvSaleDetails.text = if (sale.fromOrder && sale.orderTimestamp > 0) {
-                    "${CurrencyFormatter.format(sale.total)}  •  Commandé: ${timeFmt.format(Date(sale.orderTimestamp))}  •  Prise: ${timeFmt.format(Date(sale.timestamp))}"
+                    "${CurrencyFormatter.format(sale.total)}  •  Commandé: ${timeFmt.format(Date(sale.orderTimestamp))}  •  Prise: ${timeFmt.format(Date(sale.timestamp))}${employeeSuffix(sale.employeeName)}"
                 } else {
-                    "${CurrencyFormatter.format(sale.total)}  •  ${timeFmt.format(Date(sale.timestamp))}"
+                    "${CurrencyFormatter.format(sale.total)}  •  ${timeFmt.format(Date(sale.timestamp))}${employeeSuffix(sale.employeeName)}"
                 }
                 r.binding.tvSalePayment.text = sale.paymentMethod
 
@@ -75,6 +75,8 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
     }
 
     override fun getItemCount() = items.size
+
+    private fun employeeSuffix(name: String) = if (name.isBlank()) "" else "  •  👤 $name"
 
     fun updateData(newItems: List<SaleListItem>) {
         items = newItems

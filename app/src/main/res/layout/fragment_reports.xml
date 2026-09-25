@@ -22,6 +22,34 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:id="@+id/btnManageEmployees"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👥 Employés"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="13sp"
+                    android:padding="8dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/btnLogout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔓 Changer d'utilisateur"
+                    android:textColor="#666666"
+                    android:textSize="13sp"
+                    android:padding="8dp" />
+
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/btnResetReports"
                 android:layout_width="wrap_content"
