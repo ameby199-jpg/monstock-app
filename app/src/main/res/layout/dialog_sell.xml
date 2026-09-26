@@ -70,6 +70,59 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="Profil client"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:id="@+id/llCustomerProfile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvProfileMan"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="10dp"
+            android:gravity="center"
+            android:textSize="24sp"
+            android:text="👨🏿"
+            android:background="@drawable/bg_profile_selected" />
+
+        <TextView
+            android:id="@+id/tvProfileWoman"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="10dp"
+            android:gravity="center"
+            android:textSize="24sp"
+            android:text="👩🏿" />
+
+        <TextView
+            android:id="@+id/tvProfileBoy"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="10dp"
+            android:gravity="center"
+            android:textSize="24sp"
+            android:text="👦🏿" />
+
+        <TextView
+            android:id="@+id/tvProfileGirl"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:textSize="24sp"
+            android:text="👧🏿" />
+
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:text="Mode de paiement"
         android:textStyle="bold"
         android:layout_marginTop="16dp"

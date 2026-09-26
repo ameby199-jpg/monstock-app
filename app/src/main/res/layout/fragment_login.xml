@@ -17,6 +17,7 @@
             android:layout_height="wrap_content"
             android:text="Connexion"
             android:textSize="24sp"
+            android:textColor="#000000"
             android:textStyle="bold" />
 
         <TextView
@@ -34,6 +35,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:hint="Ton nom"
+            android:textColor="#000000"
+            android:textColorHint="#999999"
             android:inputType="textPersonName"
             android:visibility="gone" />
 
@@ -43,6 +46,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:hint="Code"
+            android:textColor="#000000"
+            android:textColorHint="#999999"
             android:inputType="numberPassword"
             android:gravity="center"
             android:textSize="22sp"
@@ -62,6 +67,17 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:text="Valider" />
+
+        <TextView
+            android:id="@+id/btnBiometric"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="🫆 Utiliser l'empreinte digitale"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:padding="10dp"
+            android:visibility="gone" />
 
     </LinearLayout>
 </ScrollView>

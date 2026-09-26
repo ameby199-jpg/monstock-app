@@ -19,6 +19,7 @@ import com.monstock.app.databinding.ItemSaleBinding
 import com.monstock.app.model.Employee
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
+import com.monstock.app.util.BiometricPrefs
 import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.DayPrefs
 import com.monstock.app.util.EmployeeSession
@@ -188,6 +189,7 @@ class ReportsFragment : Fragment() {
     private fun renderEmployeesDialog(repo: FirebaseRepo, employees: List<Employee>) {
         val dialogBinding = DialogEmployeesBinding.inflate(layoutInflater)
         dialogBinding.llEmployeesList.removeAllViews()
+        lateinit var dialog: AlertDialog
 
         employees.forEach { employee ->
             val row = android.widget.LinearLayout(requireContext()).apply {
@@ -211,6 +213,24 @@ class ReportsFragment : Fragment() {
                 setPadding(24, 0, 24, 0)
                 setOnClickListener { showAddEditEmployeeDialog(repo, employee) }
             }
+            val isBiometricUser = BiometricPrefs.getBiometricEmployeeId(requireContext()) == employee.id
+            val biometricBtn = android.widget.TextView(requireContext()).apply {
+                text = "🫆"
+                textSize = 18f
+                alpha = if (isBiometricUser) 1f else 0.35f
+                setPadding(0, 0, 24, 0)
+                setOnClickListener {
+                    if (isBiometricUser) {
+                        BiometricPrefs.clearBiometricEmployee(requireContext())
+                        android.widget.Toast.makeText(requireContext(), "🫆 Empreinte désactivée pour ${employee.name}", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        BiometricPrefs.setBiometricEmployee(requireContext(), employee)
+                        android.widget.Toast.makeText(requireContext(), "🫆 Empreinte activée pour ${employee.name} sur cet appareil", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    dialog.dismiss()
+                    renderEmployeesDialog(repo, employees)
+                }
+            }
             val deleteBtn = android.widget.TextView(requireContext()).apply {
                 text = "🗑"
                 textSize = 18f
@@ -224,11 +244,12 @@ class ReportsFragment : Fragment() {
             }
             row.addView(info)
             row.addView(editBtn)
+            row.addView(biometricBtn)
             row.addView(deleteBtn)
             dialogBinding.llEmployeesList.addView(row)
         }
 
-        val dialog = AlertDialog.Builder(requireContext())
+        dialog = AlertDialog.Builder(requireContext())
             .setTitle("Employés")
             .setView(dialogBinding.root)
             .setNegativeButton("Fermer", null)

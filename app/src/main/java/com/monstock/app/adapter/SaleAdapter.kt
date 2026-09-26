@@ -50,9 +50,9 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
 
                 // Les ventes issues d'une commande prise (⏰ -> Prendre) sont marquées ici.
                 r.binding.tvSaleName.text = if (sale.fromOrder) {
-                    "${sale.productName} x${sale.quantity}  🕑 Commande"
+                    "${profilePrefix(sale.customerProfile)}${sale.productName} x${sale.quantity}  🕑 Commande"
                 } else {
-                    "${sale.productName} x${sale.quantity}"
+                    "${profilePrefix(sale.customerProfile)}${sale.productName} x${sale.quantity}"
                 }
 
                 r.binding.tvSaleDetails.text = if (sale.fromOrder && sale.orderTimestamp > 0) {
@@ -77,6 +77,8 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
     override fun getItemCount() = items.size
 
     private fun employeeSuffix(name: String) = if (name.isBlank()) "" else "  •  👤 $name"
+
+    private fun profilePrefix(profile: String) = if (profile.isBlank()) "" else "$profile "
 
     fun updateData(newItems: List<SaleListItem>) {
         items = newItems

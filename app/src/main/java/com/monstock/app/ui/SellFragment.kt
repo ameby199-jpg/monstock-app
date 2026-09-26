@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -153,6 +154,18 @@ class SellFragment : Fragment() {
         dialogBinding.tvUnitPrice.text = "Prix unitaire : ${CurrencyFormatter.format(product.price)}"
         dialogBinding.etQuantitySold.setText("1")
 
+        // Profil client : 👨 sélectionné par défaut, l'utilisateur peut choisir un autre avant de valider.
+        var selectedProfile = "👨🏿"
+        val profileViews = listOf(
+            dialogBinding.tvProfileMan, dialogBinding.tvProfileWoman,
+            dialogBinding.tvProfileBoy, dialogBinding.tvProfileGirl
+        )
+        fun selectProfile(view: android.widget.TextView) {
+            selectedProfile = view.text.toString()
+            profileViews.forEach { it.background = if (it == view) ContextCompat.getDrawable(requireContext(), R.drawable.bg_profile_selected) else null }
+        }
+        profileViews.forEach { view -> view.setOnClickListener { selectProfile(view) } }
+
         fun updateTotal() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price)}"
@@ -190,6 +203,7 @@ class SellFragment : Fragment() {
                 repo.recordSale(
                     product, qtySold, paymentMethod,
                     employeeName = EmployeeSession.getCurrentName(requireContext()),
+                    customerProfile = selectedProfile,
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
@@ -210,7 +224,7 @@ class SellFragment : Fragment() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
                 repo.addOrder(
-                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice)),
+                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile)),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
@@ -230,7 +244,7 @@ class SellFragment : Fragment() {
         dialogBinding.btnAddToCart.setOnClickListener {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
-                draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice))
+                draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile))
                 updateCartButton()
                 android.widget.Toast.makeText(
                     requireContext(),

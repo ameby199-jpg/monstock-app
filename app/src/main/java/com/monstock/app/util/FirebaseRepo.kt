@@ -157,6 +157,7 @@ class FirebaseRepo(private val shopCode: String) {
                         paymentMethod = d.getString("paymentMethod") ?: "Espèces",
                         fromOrder = d.getBoolean("fromOrder") ?: false,
                         employeeName = d.getString("employeeName") ?: "",
+                        customerProfile = d.getString("customerProfile") ?: "",
                         ownerId = shopCode
                     )
                 }
@@ -169,6 +170,7 @@ class FirebaseRepo(private val shopCode: String) {
         quantitySold: Long,
         paymentMethod: String,
         employeeName: String = "",
+        customerProfile: String = "",
         onError: (String) -> Unit = {},
         onSuccess: () -> Unit = {}
     ) {
@@ -183,7 +185,8 @@ class FirebaseRepo(private val shopCode: String) {
             "timestamp" to System.currentTimeMillis(),
             "paymentMethod" to paymentMethod,
             "fromOrder" to false,
-            "employeeName" to employeeName
+            "employeeName" to employeeName,
+            "customerProfile" to customerProfile
         )
         shopDoc().collection("sales").add(sale)
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
@@ -220,7 +223,8 @@ class FirebaseRepo(private val shopCode: String) {
                             productName = m["productName"] as? String ?: "",
                             quantity = (m["quantity"] as? Number)?.toLong() ?: 0,
                             unitPrice = (m["unitPrice"] as? Number)?.toDouble() ?: 0.0,
-                            costPrice = (m["costPrice"] as? Number)?.toDouble() ?: 0.0
+                            costPrice = (m["costPrice"] as? Number)?.toDouble() ?: 0.0,
+                            customerProfile = m["customerProfile"] as? String ?: ""
                         )
                     }
                     Order(id = d.id, items = items, timestamp = d.getLong("timestamp") ?: 0)
@@ -237,7 +241,8 @@ class FirebaseRepo(private val shopCode: String) {
                 "productName" to line.productName,
                 "quantity" to line.quantity,
                 "unitPrice" to line.unitPrice,
-                "costPrice" to line.costPrice
+                "costPrice" to line.costPrice,
+                "customerProfile" to line.customerProfile
             )
         }
         val data = hashMapOf(
@@ -286,7 +291,8 @@ class FirebaseRepo(private val shopCode: String) {
                 "orderTimestamp" to order.timestamp,
                 "paymentMethod" to paymentMethod,
                 "fromOrder" to true,
-                "employeeName" to employeeName
+                "employeeName" to employeeName,
+                "customerProfile" to line.customerProfile
             )
             shopDoc().collection("sales").add(sale)
                 .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }

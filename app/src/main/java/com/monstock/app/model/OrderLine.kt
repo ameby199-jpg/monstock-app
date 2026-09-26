@@ -5,5 +5,6 @@ data class OrderLine(
     var productName: String = "",
     var quantity: Long = 0,
     var unitPrice: Double = 0.0,
-    var costPrice: Double = 0.0
+    var costPrice: Double = 0.0,
+    var customerProfile: String = ""
 )

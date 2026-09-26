@@ -15,5 +15,7 @@ data class Sale(
     var paymentMethod: String = "Espèces",
     var fromOrder: Boolean = false,
     var employeeName: String = "",
+    // Profil du client choisi au moment de la vente/commande (emoji : 👨 👩 👦 👧), affiché dans Ventes.
+    var customerProfile: String = "",
     var ownerId: String = ""
 )

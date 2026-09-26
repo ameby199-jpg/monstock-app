@@ -237,6 +237,17 @@ class StockFragment : Fragment() {
         dialogBinding.btnOrderSingle.visibility = View.GONE
         dialogBinding.btnAddToCart.visibility = View.GONE
 
+        var selectedProfile = "👨🏿"
+        val profileViews = listOf(
+            dialogBinding.tvProfileMan, dialogBinding.tvProfileWoman,
+            dialogBinding.tvProfileBoy, dialogBinding.tvProfileGirl
+        )
+        fun selectProfile(view: android.widget.TextView) {
+            selectedProfile = view.text.toString()
+            profileViews.forEach { it.background = if (it == view) androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.bg_profile_selected) else null }
+        }
+        profileViews.forEach { view -> view.setOnClickListener { selectProfile(view) } }
+
         fun updateTotal() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price)}"
@@ -274,6 +285,7 @@ class StockFragment : Fragment() {
                 repo.recordSale(
                     product, qtySold, paymentMethod,
                     employeeName = EmployeeSession.getCurrentName(requireContext()),
+                    customerProfile = selectedProfile,
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
