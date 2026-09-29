@@ -8,6 +8,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,6 +38,7 @@ class ReportsFragment : Fragment() {
     private var latestSalesToday: List<Sale> = emptyList()
     private var latestSalesWeek: List<Sale> = emptyList()
     private var latestSalesMonth: List<Sale> = emptyList()
+    private var allSales: List<Sale> = emptyList()
 
     // Bénéfices masqués par défaut ; il faut le code pour les révéler, à chaque ouverture de l'écran.
     private var profitVisible = false
@@ -88,6 +92,8 @@ class ReportsFragment : Fragment() {
         if (EmployeeSession.isResponsable(requireContext())) {
             binding.btnManageEmployees.visibility = View.VISIBLE
             binding.btnManageEmployees.setOnClickListener { showEmployeesDialog(repo) }
+            binding.btnClientAnalysis.visibility = View.VISIBLE
+            binding.btnClientAnalysis.setOnClickListener { requireSecureAccess { renderClientAnalysis() } }
         }
 
         val profitClick = View.OnClickListener { toggleProfitVisibility() }
@@ -95,7 +101,97 @@ class ReportsFragment : Fragment() {
         binding.tvWeekProfit.setOnClickListener(profitClick)
         binding.tvMonthProfit.setOnClickListener(profitClick)
 
-        listener = repo.listenSales { sales -> updateStats(sales) }
+        listener = repo.listenSales { sales -> allSales = sales; updateStats(sales) }
+    }
+
+    /**
+     * Porte d'accès pour les écrans sensibles (analyse clients) : code, ou empreinte digitale
+     * si un employé l'a activée sur cet appareil (voir 🫆 dans Employés).
+     */
+    private fun requireSecureAccess(onGranted: () -> Unit) {
+        val biometricEmployee = BiometricPrefs.getBiometricEmployee(requireContext())
+        val canBiometric = biometricEmployee != null &&
+            BiometricManager.from(requireContext()).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+
+        val input = android.widget.EditText(requireContext())
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(padding, padding, padding, padding)
+
+        val builder = AlertDialog.Builder(requireContext())
+            .setTitle("Accès protégé")
+            .setMessage(if (canBiometric) "Entre le code, ou utilise l'empreinte digitale." else "Entre le code pour continuer.")
+            .setView(input)
+            .setPositiveButton("Valider") { _, _ ->
+                if (input.text.toString() == profitPasscode) onGranted()
+                else android.widget.Toast.makeText(requireContext(), "Code incorrect", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Annuler", null)
+        if (canBiometric) {
+            builder.setNeutralButton("🫆 Empreinte") { _, _ -> showBiometricThenGrant(onGranted) }
+        }
+        builder.show()
+    }
+
+    private fun showBiometricThenGrant(onGranted: () -> Unit) {
+        val executor = ContextCompat.getMainExecutor(requireContext())
+        val prompt = BiometricPrompt(
+            this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    onGranted()
+                }
+            }
+        )
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Accès protégé")
+            .setSubtitle("Confirme ton empreinte")
+            .setNegativeButtonText("Annuler")
+            .build()
+        prompt.authenticate(info)
+    }
+
+    /**
+     * Étude des profils clients (👨🏿 👩🏿 👦🏿 👧🏿) : qui achète le plus, et leurs produits préférés,
+     * sur la base de toutes les ventes enregistrées avec un profil.
+     */
+    private fun renderClientAnalysis() {
+        val profiles = listOf("👨🏿" to "Hommes", "👩🏿" to "Femmes", "👦🏿" to "Garçons", "👧🏿" to "Filles")
+        val byProfile = allSales.groupBy { it.customerProfile }
+
+        val rows = profiles.mapNotNull { (emoji, label) ->
+            val list = byProfile[emoji] ?: emptyList()
+            if (list.isEmpty()) null else Triple(emoji to label, list.sumOf { it.total }, list)
+        }.sortedByDescending { it.second }
+
+        val sb = StringBuilder()
+        if (rows.isEmpty()) {
+            sb.append("Pas encore assez de ventes avec un profil client renseigné.")
+        } else {
+            val leader = rows.first()
+            sb.append("🏆 Achète le plus : ${leader.first.first} ${leader.first.second} — ${CurrencyFormatter.format(leader.second)}\n\n")
+            rows.forEach { (info, total, list) ->
+                val (emoji, label) = info
+                val qty = list.sumOf { it.quantity }
+                val topProducts = list.groupBy { it.productName }
+                    .map { (name, l) -> name to l.sumOf { it.quantity } }
+                    .sortedByDescending { it.second }
+                    .take(3)
+                    .joinToString(", ") { "${it.first} (${it.second})" }
+                sb.append("$emoji $label — ${CurrencyFormatter.format(total)}  •  $qty article(s)\n")
+                sb.append("   Préférences : $topProducts\n\n")
+            }
+        }
+        val unspecified = allSales.count { it.customerProfile.isBlank() }
+        if (unspecified > 0) {
+            sb.append("($unspecified vente(s) sans profil renseigné, non comptées ci-dessus)")
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("📊 Analyse clients")
+            .setMessage(sb.toString())
+            .setPositiveButton("Fermer", null)
+            .show()
     }
 
     /** Bénéfices masqués par "🔒 Appuyer pour afficher" ; un appui demande le code pour les révéler. */

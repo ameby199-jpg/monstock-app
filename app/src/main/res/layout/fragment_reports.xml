@@ -30,6 +30,16 @@
                 android:layout_marginBottom="4dp">
 
                 <TextView
+                    android:id="@+id/btnClientAnalysis"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📊 Analyse"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="13sp"
+                    android:padding="8dp"
+                    android:visibility="gone" />
+
+                <TextView
                     android:id="@+id/btnManageEmployees"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

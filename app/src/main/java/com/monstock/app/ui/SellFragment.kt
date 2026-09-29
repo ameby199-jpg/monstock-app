@@ -379,6 +379,13 @@ class SellFragment : Fragment() {
             dialog.dismiss()
             pickBackground.launch("image/*")
         }
+        dialogBinding.optBackgroundColor.setOnClickListener {
+            dialog.dismiss()
+            showColorPickerDialog { color ->
+                BackgroundPrefs.saveCustomColor(requireContext(), "sell", color)
+                BackgroundPrefs.applyBackground(requireContext(), "sell", binding.ivBackground)
+            }
+        }
         dialogBinding.optTheme.setOnClickListener {
             dialog.dismiss()
             showThemePickerDialog()

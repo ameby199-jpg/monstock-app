@@ -44,8 +44,12 @@ class OrderAdapter(
                 )
             }
             val nameView = TextView(context).apply {
-                text = "${line.productName} x${line.quantity}"
-                textSize = 14f
+                text = if (line.customerProfile.isBlank()) {
+                    "${line.productName} x${line.quantity}"
+                } else {
+                    "${line.customerProfile}  ${line.productName} x${line.quantity}"
+                }
+                textSize = 16f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val priceView = TextView(context).apply {

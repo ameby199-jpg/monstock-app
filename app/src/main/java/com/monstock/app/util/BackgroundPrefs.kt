@@ -38,7 +38,29 @@ object BackgroundPrefs {
      * la photo personnalisée si l'utilisateur en a choisi une, sinon la prochaine
      * photo par défaut dans la rotation.
      */
+    /** Sauvegarde une couleur unie comme fond pour cet écran (remplace toute photo personnalisée). */
+    fun saveCustomColor(context: Context, screenKey: String, color: Int) {
+        prefs(context).edit()
+            .putInt("color_$screenKey", color)
+            .remove("custom_$screenKey")
+            .apply()
+    }
+
+    /** Retire la couleur personnalisée pour revenir aux photos par défaut sur cet écran. */
+    fun clearCustomColor(context: Context, screenKey: String) {
+        prefs(context).edit().remove("color_$screenKey").apply()
+    }
+
     fun applyBackground(context: Context, screenKey: String, imageView: ImageView) {
+        imageView.setBackgroundColor(0) // reset : pas de couleur unie tant qu'on n'en a pas trouvé une
+
+        val customColor = prefs(context).getInt("color_$screenKey", 0)
+        if (customColor != 0) {
+            imageView.setImageDrawable(null)
+            imageView.setBackgroundColor(customColor)
+            return
+        }
+
         val custom = prefs(context).getString("custom_$screenKey", null)
         if (custom != null) {
             val bitmap = decodeBase64(custom)
@@ -61,7 +83,10 @@ object BackgroundPrefs {
 
     /** Sauvegarde la photo choisie par l'utilisateur comme fond personnalisé pour cet écran. */
     fun saveCustomBackground(context: Context, screenKey: String, bitmap: Bitmap) {
-        prefs(context).edit().putString("custom_$screenKey", compressToBase64(bitmap)).apply()
+        prefs(context).edit()
+            .putString("custom_$screenKey", compressToBase64(bitmap))
+            .remove("color_$screenKey")
+            .apply()
     }
 
     /** Retire le fond personnalisé pour revenir à la rotation par défaut sur cet écran. */
