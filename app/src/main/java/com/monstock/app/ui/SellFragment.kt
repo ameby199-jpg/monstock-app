@@ -192,13 +192,15 @@ class SellFragment : Fragment() {
             .setNegativeButton(R.string.cancel, null)
             .create()
 
+        fun currentPaymentMethod(): String = when (dialogBinding.rgPayment.checkedRadioButtonId) {
+            dialogBinding.rbOrangeMoney.id -> "Orange Money"
+            dialogBinding.rbWave.id -> "Wave"
+            else -> "Espèces"
+        }
+
         dialogBinding.btnSellNow.setOnClickListener {
             val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-            val paymentMethod = when (dialogBinding.rgPayment.checkedRadioButtonId) {
-                dialogBinding.rbOrangeMoney.id -> "Orange Money"
-                dialogBinding.rbWave.id -> "Wave"
-                else -> "Espèces"
-            }
+            val paymentMethod = currentPaymentMethod()
             if (qtySold in 1..product.quantity) {
                 repo.recordSale(
                     product, qtySold, paymentMethod,
@@ -224,7 +226,7 @@ class SellFragment : Fragment() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
                 repo.addOrder(
-                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile)),
+                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile, currentPaymentMethod())),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
@@ -244,7 +246,7 @@ class SellFragment : Fragment() {
         dialogBinding.btnAddToCart.setOnClickListener {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
-                draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile))
+                draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile, currentPaymentMethod()))
                 updateCartButton()
                 android.widget.Toast.makeText(
                     requireContext(),

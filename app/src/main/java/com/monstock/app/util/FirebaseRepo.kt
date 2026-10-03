@@ -224,7 +224,8 @@ class FirebaseRepo(private val shopCode: String) {
                             quantity = (m["quantity"] as? Number)?.toLong() ?: 0,
                             unitPrice = (m["unitPrice"] as? Number)?.toDouble() ?: 0.0,
                             costPrice = (m["costPrice"] as? Number)?.toDouble() ?: 0.0,
-                            customerProfile = m["customerProfile"] as? String ?: ""
+                            customerProfile = m["customerProfile"] as? String ?: "",
+                            paymentMethod = m["paymentMethod"] as? String ?: "Espèces"
                         )
                     }
                     Order(id = d.id, items = items, timestamp = d.getLong("timestamp") ?: 0)
@@ -242,7 +243,8 @@ class FirebaseRepo(private val shopCode: String) {
                 "quantity" to line.quantity,
                 "unitPrice" to line.unitPrice,
                 "costPrice" to line.costPrice,
-                "customerProfile" to line.customerProfile
+                "customerProfile" to line.customerProfile,
+                "paymentMethod" to line.paymentMethod
             )
         }
         val data = hashMapOf(
@@ -289,7 +291,7 @@ class FirebaseRepo(private val shopCode: String) {
                 "total" to total,
                 "timestamp" to now,
                 "orderTimestamp" to order.timestamp,
-                "paymentMethod" to paymentMethod,
+                "paymentMethod" to line.paymentMethod,
                 "fromOrder" to true,
                 "employeeName" to employeeName,
                 "customerProfile" to line.customerProfile
