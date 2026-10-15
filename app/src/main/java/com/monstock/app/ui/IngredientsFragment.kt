@@ -72,19 +72,22 @@ class IngredientsFragment : Fragment() {
             onEditStockActuel = { ingredient ->
                 showQuickEditDialog(
                     title = "Stock actuel : ${ingredient.name}",
-                    currentValue = ingredient.stockActuel
+                    currentValue = ingredient.stockActuel,
+                    stockActuelRef = ingredient.stockActuel
                 ) { value -> repo.updateStockActuel(ingredient.id, value) { msg -> toastError(msg) } }
             },
             onEditAchat = { ingredient ->
                 showQuickEditDialog(
                     title = "Achat du jour : ${ingredient.name}",
-                    currentValue = ingredient.achatDuJour
+                    currentValue = ingredient.achatDuJour,
+                    stockActuelRef = ingredient.stockActuel
                 ) { value -> repo.updateAchatDuJour(ingredient.id, value) { msg -> toastError(msg) } }
             },
             onEditNouveauStock = { ingredient ->
                 showQuickEditDialog(
                     title = "Nouveau stock : ${ingredient.name}",
-                    currentValue = ingredient.nouveauStock
+                    currentValue = ingredient.nouveauStock,
+                    stockActuelRef = ingredient.stockActuel
                 ) { value -> repo.updateNouveauStock(ingredient.id, value) { msg -> toastError(msg) } }
             }
         )
@@ -295,16 +298,32 @@ class IngredientsFragment : Fragment() {
     }
 
     /** Édition rapide en appuyant directement sur une colonne du tableau (Stock actuel, Achat du jour, Nouveau stock). */
-    private fun showQuickEditDialog(title: String, currentValue: Double, onSave: (Double) -> Unit) {
+    private fun showQuickEditDialog(title: String, currentValue: Double, stockActuelRef: Double, onSave: (Double) -> Unit) {
+        val density = resources.displayMetrics.density
+        val padding = (16 * density).toInt()
+
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, 0)
+        }
+        // Rappel toujours visible, quelle que soit la case éditée, pour avoir le repère sous les yeux.
+        val refView = android.widget.TextView(requireContext()).apply {
+            text = "Stock actuel : ${CurrencyFormatter.format(stockActuelRef)}"
+            textSize = 13f
+            setTextColor(android.graphics.Color.parseColor("#888888"))
+            setPadding(0, 0, 0, (8 * density).toInt())
+        }
         val input = EditText(requireContext())
         input.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-        input.setText(currentValue.toString())
-        val padding = (16 * resources.displayMetrics.density).toInt()
-        input.setPadding(padding, padding, padding, padding)
+        // Pas de "0.0" pré-rempli : champ vide quand la valeur actuelle est 0, pour taper directement.
+        input.setText(if (currentValue == 0.0) "" else currentValue.toString())
+
+        container.addView(refView)
+        container.addView(input)
 
         AlertDialog.Builder(requireContext())
             .setTitle(title)
-            .setView(input)
+            .setView(container)
             .setPositiveButton(R.string.save) { _, _ ->
                 val value = input.text.toString().toDoubleOrNull() ?: currentValue
                 onSave(value)
