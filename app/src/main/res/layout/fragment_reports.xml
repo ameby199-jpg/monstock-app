@@ -147,8 +147,11 @@
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView
+                android:id="@+id/cardWeek"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
                 app:cardBackgroundColor="@color/surface"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="3dp"
@@ -204,12 +207,23 @@
                         android:textSize="20sp"
                         android:textStyle="bold"
                         android:textColor="@color/accent" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="👉 Appuyer pour voir le détail par jour"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorPrimary"
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView
+                android:id="@+id/cardMonth"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
                 app:cardBackgroundColor="@color/surface"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="3dp"
@@ -265,6 +279,14 @@
                         android:textSize="20sp"
                         android:textStyle="bold"
                         android:textColor="@color/accent" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="👉 Appuyer pour voir le détail par jour"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorPrimary"
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

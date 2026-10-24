@@ -15,11 +15,15 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.firestore.ListenerRegistration
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.monstock.app.MainActivity
 import com.monstock.app.databinding.DialogEmployeesBinding
 import com.monstock.app.databinding.FragmentReportsBinding
 import com.monstock.app.databinding.ItemSaleBinding
 import com.monstock.app.model.Employee
+import com.monstock.app.model.IngredientHistoryEntry
 import com.monstock.app.model.Sale
 import com.monstock.app.util.BackgroundPrefs
 import com.monstock.app.util.BiometricPrefs
@@ -39,6 +43,12 @@ class ReportsFragment : Fragment() {
     private var latestSalesWeek: List<Sale> = emptyList()
     private var latestSalesMonth: List<Sale> = emptyList()
     private var allSales: List<Sale> = emptyList()
+
+    // Bénéfice Semaine/Mois basé sur le BNF de l'Inventaire (⛓️), pas sur les ventes — sur demande explicite.
+    // "Aujourd'hui" reste basé sur les ventes, lui.
+    private var ingredientHistoryEntries: List<IngredientHistoryEntry> = emptyList()
+    private var startOfWeekMillis = 0L
+    private var startOfMonthMillis = 0L
 
     // Bénéfices masqués par défaut ; il faut le code pour les révéler, à chaque ouverture de l'écran.
     private var profitVisible = false
@@ -101,8 +111,24 @@ class ReportsFragment : Fragment() {
         binding.tvWeekProfit.setOnClickListener(profitClick)
         binding.tvMonthProfit.setOnClickListener(profitClick)
 
+        binding.cardWeek.setOnClickListener {
+            requireSecureAccess { renderPeriodBreakdown("Détail de la semaine", latestSalesWeek) }
+        }
+        binding.cardMonth.setOnClickListener {
+            requireSecureAccess { renderPeriodBreakdown("Détail du mois", latestSalesMonth) }
+        }
+
         listener = repo.listenSales { sales -> allSales = sales; updateStats(sales) }
+
+        repo.getIngredientHistory(
+            onResult = { entries -> ingredientHistoryEntries = entries; renderProfits() },
+            onError = { }
+        )
     }
+
+    /** Somme des BNF (Inventaire, bouton ⛓️) enregistrés depuis [sinceMillis]. */
+    private fun inventoryProfit(sinceMillis: Long): Double =
+        ingredientHistoryEntries.filter { it.timestamp >= sinceMillis }.sumOf { it.totalChiffres }
 
     /**
      * Porte d'accès pour les écrans sensibles (analyse clients) : code, ou empreinte digitale
@@ -194,6 +220,45 @@ class ReportsFragment : Fragment() {
             .show()
     }
 
+    /** Détail jour par jour (CA + bénéfice) d'une période (semaine ou mois), protégé comme les bénéfices. */
+    private fun renderPeriodBreakdown(title: String, sales: List<Sale>) {
+        if (sales.isEmpty()) {
+            AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage("Aucune vente sur cette période.")
+                .setPositiveButton("Fermer", null)
+                .show()
+            return
+        }
+
+        val cal = Calendar.getInstance()
+        fun dayKey(ts: Long): Long {
+            cal.timeInMillis = ts
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+            return cal.timeInMillis
+        }
+        val dayFmt = SimpleDateFormat("EEEE dd/MM", Locale.FRENCH)
+        val byDay = sales.groupBy { dayKey(it.timestamp) }.toSortedMap(compareByDescending { it })
+        // Bénéfice par jour basé sur le BNF Inventaire (⛓️), comme pour les totaux Semaine/Mois.
+        val historyByDay = ingredientHistoryEntries.groupBy { dayKey(it.timestamp) }
+
+        val sb = StringBuilder()
+        byDay.forEach { (dayMillis, daySales) ->
+            val label = dayFmt.format(Date(dayMillis)).replaceFirstChar { it.uppercase() }
+            val revenue = daySales.sumOf { it.total }
+            val dayProfit = historyByDay[dayMillis]?.sumOf { it.totalChiffres } ?: 0.0
+            sb.append("📅 $label\n")
+            sb.append("   CA : ${CurrencyFormatter.format(revenue)}  •  Bénéfice : ${CurrencyFormatter.format(dayProfit)}  •  ${daySales.size} vente(s)\n\n")
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setMessage(sb.toString().trim())
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
     /** Bénéfices masqués par "🔒 Appuyer pour afficher" ; un appui demande le code pour les révéler. */
     private fun toggleProfitVisibility() {
         if (profitVisible) {
@@ -224,8 +289,8 @@ class ReportsFragment : Fragment() {
     private fun renderProfits() {
         if (profitVisible) {
             binding.tvTodayProfit.text = CurrencyFormatter.format(profit(latestSalesToday))
-            binding.tvWeekProfit.text = CurrencyFormatter.format(profit(latestSalesWeek))
-            binding.tvMonthProfit.text = CurrencyFormatter.format(profit(latestSalesMonth))
+            binding.tvWeekProfit.text = CurrencyFormatter.format(inventoryProfit(startOfWeekMillis))
+            binding.tvMonthProfit.text = CurrencyFormatter.format(inventoryProfit(startOfMonthMillis))
         } else {
             val hidden = "🔒 Appuyer pour afficher"
             binding.tvTodayProfit.text = hidden
@@ -428,6 +493,8 @@ class ReportsFragment : Fragment() {
         latestSalesToday = salesToday
         latestSalesWeek = salesWeek
         latestSalesMonth = salesMonth
+        startOfWeekMillis = startOfWeek
+        startOfMonthMillis = startOfMonth
 
         binding.tvToday.text = CurrencyFormatter.format(salesToday.sumOf { it.total })
         binding.tvWeek.text = CurrencyFormatter.format(salesWeek.sumOf { it.total })

@@ -175,9 +175,9 @@ class IngredientsFragment : Fragment() {
         val summaryView = TextView(requireContext()).apply {
             val chiffres = entry.totalChiffres
             text = if (chiffres >= 0) {
-                "Achat du jour : ${CurrencyFormatter.format(entry.totalAchat)} • BNF ${CurrencyFormatter.format(chiffres)}"
+                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • BNF ${CurrencyFormatter.format(chiffres)}"
             } else {
-                "Achat du jour : ${CurrencyFormatter.format(entry.totalAchat)} • − ${CurrencyFormatter.format(abs(chiffres))}"
+                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • − ${CurrencyFormatter.format(abs(chiffres))}"
             }
             textSize = 13f
             setTextColor(if (chiffres >= 0) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
