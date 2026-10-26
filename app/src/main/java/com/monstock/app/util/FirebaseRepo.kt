@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.monstock.app.model.Employee
+import com.monstock.app.model.ExpenseNote
 import com.monstock.app.model.Ingredient
 import com.monstock.app.model.IngredientHistoryEntry
 import com.monstock.app.model.IngredientHistoryItem
@@ -396,7 +397,7 @@ class FirebaseRepo(private val shopCode: String) {
      * produit) est enregistré dans l'historique (bouton 💾), consultable à tout moment.
      * Utilise un batch Firestore pour appliquer tout ça d'un coup.
      */
-    fun validateAllStocks(ingredients: List<Ingredient>, onError: (String) -> Unit = {}) {
+    fun validateAllStocks(ingredients: List<Ingredient>, expenses: List<ExpenseNote> = emptyList(), onError: (String) -> Unit = {}) {
         val batch = db.batch()
         val collection = shopDoc().collection("ingredients")
 
@@ -409,8 +410,9 @@ class FirebaseRepo(private val shopCode: String) {
                 "nouveauStock" to ing.nouveauStock
             )
         }
+        val expensesData = expenses.map { exp -> hashMapOf("note" to exp.note, "amount" to exp.amount) }
         val historyDoc = shopDoc().collection("ingredientHistory").document()
-        batch.set(historyDoc, hashMapOf("timestamp" to System.currentTimeMillis(), "items" to itemsData))
+        batch.set(historyDoc, hashMapOf("timestamp" to System.currentTimeMillis(), "items" to itemsData, "expenses" to expensesData))
 
         // 2) Report du nouveau stock vers le stock actuel, puis remise à zéro.
         for (ing in ingredients) {
@@ -443,7 +445,15 @@ class FirebaseRepo(private val shopCode: String) {
                             nouveauStock = (m["nouveauStock"] as? Number)?.toDouble() ?: 0.0
                         )
                     }
-                    IngredientHistoryEntry(id = d.id, timestamp = timestamp, items = items)
+                    @Suppress("UNCHECKED_CAST")
+                    val expensesRaw = d.get("expenses") as? List<Map<String, Any>> ?: emptyList()
+                    val expenses = expensesRaw.map { m ->
+                        ExpenseNote(
+                            note = m["note"] as? String ?: "",
+                            amount = (m["amount"] as? Number)?.toDouble() ?: 0.0
+                        )
+                    }
+                    IngredientHistoryEntry(id = d.id, timestamp = timestamp, items = items, expenses = expenses)
                 }
                 onResult(list)
             }

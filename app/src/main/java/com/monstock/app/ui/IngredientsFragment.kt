@@ -20,6 +20,7 @@ import com.monstock.app.databinding.DialogEditQuantityBinding
 import com.monstock.app.databinding.DialogIngredientHistoryBinding
 import com.monstock.app.databinding.DialogIngredientHistoryDetailBinding
 import com.monstock.app.databinding.FragmentIngredientsBinding
+import com.monstock.app.model.ExpenseNote
 import com.monstock.app.model.Ingredient
 import com.monstock.app.model.IngredientHistoryEntry
 import com.monstock.app.util.CurrencyFormatter
@@ -110,20 +111,146 @@ class IngredientsFragment : Fragment() {
      * sauvegardé dans l'historique (bouton 💾). Action groupée et irréversible,
      * donc confirmation obligatoire avant de l'appliquer.
      */
+    // Dépenses notées pour la journée en cours, ajoutées via le bouton 💰 avant de valider ⛓️.
+    private val pendingExpenses = mutableListOf<ExpenseNote>()
+
     private fun confirmValidateAllStocks() {
         if (currentIngredients.isEmpty()) return
+        val density = resources.displayMetrics.density
+        val padding = (20 * density).toInt()
+
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, (8 * density).toInt(), padding, 0)
+        }
+        val messageView = TextView(requireContext()).apply {
+            text = "Cette journée sera d'abord enregistrée dans l'historique (💾).\n\n" +
+                "Ensuite, pour chaque produit : le \"Nouveau stock\" remplacera le \"Stock actuel\", " +
+                "puis \"Nouveau stock\" et \"Achat du jour\" repasseront à 0.\n\nCette action ne peut pas être annulée."
+            textSize = 15f
+        }
+        val expensesBtn = TextView(requireContext()).apply {
+            textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(android.graphics.Color.parseColor("#2196F3"))
+            setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
+        }
+        fun refreshExpensesLabel() {
+            expensesBtn.text = if (pendingExpenses.isEmpty()) {
+                "💰 Dépenses — appuyer pour noter"
+            } else {
+                "💰 Dépenses (${pendingExpenses.size}) : ${CurrencyFormatter.format(pendingExpenses.sumOf { it.amount })}"
+            }
+        }
+        refreshExpensesLabel()
+        expensesBtn.setOnClickListener { showExpensesDialog { refreshExpensesLabel() } }
+
+        container.addView(messageView)
+        container.addView(expensesBtn)
+
         AlertDialog.Builder(requireContext())
             .setTitle("Reporter le nouveau stock ?")
-            .setMessage(
-                "Cette journée sera d'abord enregistrée dans l'historique (💾).\n\n" +
-                    "Ensuite, pour chaque produit : le \"Nouveau stock\" remplacera le \"Stock actuel\", " +
-                    "puis \"Nouveau stock\" et \"Achat du jour\" repasseront à 0.\n\nCette action ne peut pas être annulée."
-            )
+            .setView(container)
             .setPositiveButton("Valider") { _, _ ->
-                repo.validateAllStocks(currentIngredients) { msg -> toastError(msg) }
+                repo.validateAllStocks(currentIngredients, pendingExpenses.toList()) { msg -> toastError(msg) }
+                pendingExpenses.clear()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    /** Petit menu pour noter les dépenses de la journée : liste + ajout d'une note (texte + montant). */
+    private fun showExpensesDialog(onChanged: () -> Unit) {
+        val density = resources.displayMetrics.density
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), 0)
+        }
+        val listContainer = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val addRow = TextView(requireContext()).apply {
+            text = "➕ Ajouter une dépense"
+            textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(android.graphics.Color.parseColor("#2196F3"))
+            setPadding(0, (12 * density).toInt(), 0, (12 * density).toInt())
+        }
+
+        lateinit var dialog: AlertDialog
+
+        fun renderList() {
+            listContainer.removeAllViews()
+            if (pendingExpenses.isEmpty()) {
+                listContainer.addView(TextView(requireContext()).apply {
+                    text = "Aucune dépense notée pour l'instant."
+                    setTextColor(android.graphics.Color.parseColor("#888888"))
+                    textSize = 13f
+                })
+            }
+            pendingExpenses.forEachIndexed { index, expense ->
+                val row = LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(0, (6 * density).toInt(), 0, (6 * density).toInt())
+                }
+                val textView = TextView(requireContext()).apply {
+                    text = "${expense.note} — ${CurrencyFormatter.format(expense.amount)}"
+                    textSize = 14f
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val deleteView = TextView(requireContext()).apply {
+                    text = "🗑"
+                    textSize = 16f
+                    setOnClickListener {
+                        pendingExpenses.removeAt(index)
+                        renderList()
+                        onChanged()
+                    }
+                }
+                row.addView(textView)
+                row.addView(deleteView)
+                listContainer.addView(row)
+            }
+        }
+        renderList()
+
+        addRow.setOnClickListener {
+            val noteInput = EditText(requireContext()).apply { hint = "Ex: transport, réparation..." }
+            val amountInput = EditText(requireContext()).apply {
+                hint = "Montant"
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            }
+            val inputContainer = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                val p = (16 * density).toInt()
+                setPadding(p, p, p, 0)
+                addView(noteInput)
+                addView(amountInput)
+            }
+            AlertDialog.Builder(requireContext())
+                .setTitle("Nouvelle dépense")
+                .setView(inputContainer)
+                .setPositiveButton(R.string.save) { _, _ ->
+                    val note = noteInput.text.toString().trim()
+                    val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
+                    if (note.isNotEmpty()) {
+                        pendingExpenses.add(ExpenseNote(note, amount))
+                        renderList()
+                        onChanged()
+                    }
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+
+        container.addView(listContainer)
+        container.addView(addRow)
+
+        dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Dépenses de la journée")
+            .setView(container)
+            .setPositiveButton("Fermer", null)
+            .create()
+        dialog.show()
     }
 
     /** Bouton 💾 : liste des journées enregistrées, la plus récente en premier. */
@@ -174,10 +301,11 @@ class IngredientsFragment : Fragment() {
         }
         val summaryView = TextView(requireContext()).apply {
             val chiffres = entry.totalChiffres
+            val expensesSuffix = if (entry.expenses.isEmpty()) "" else " • 💰 ${CurrencyFormatter.format(entry.totalExpenses)}"
             text = if (chiffres >= 0) {
-                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • BNF ${CurrencyFormatter.format(chiffres)}"
+                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • BNF ${CurrencyFormatter.format(chiffres)}$expensesSuffix"
             } else {
-                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • − ${CurrencyFormatter.format(abs(chiffres))}"
+                "Achat : ${CurrencyFormatter.format(entry.totalAchat)} • Nouveau stock : ${CurrencyFormatter.format(entry.totalNouveau)} • − ${CurrencyFormatter.format(abs(chiffres))}$expensesSuffix"
             }
             textSize = 13f
             setTextColor(if (chiffres >= 0) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
@@ -219,6 +347,33 @@ class IngredientsFragment : Fragment() {
             row.addView(nameView)
             row.addView(detailView)
             dialogBinding.llDetailItems.addView(row)
+        }
+
+        if (entry.expenses.isNotEmpty()) {
+            val expensesTitle = TextView(requireContext()).apply {
+                text = "💰 Dépenses de la journée"
+                textSize = 15f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                val margin = (10 * resources.displayMetrics.density).toInt()
+                setPadding(0, margin, 0, (4 * resources.displayMetrics.density).toInt())
+            }
+            dialogBinding.llDetailItems.addView(expensesTitle)
+            entry.expenses.forEach { expense ->
+                val expenseView = TextView(requireContext()).apply {
+                    text = "• ${expense.note} — ${CurrencyFormatter.format(expense.amount)}"
+                    textSize = 13f
+                    setTextColor(Color.parseColor("#666666"))
+                }
+                dialogBinding.llDetailItems.addView(expenseView)
+            }
+            val expensesTotal = TextView(requireContext()).apply {
+                text = "Total dépenses : ${CurrencyFormatter.format(entry.totalExpenses)}"
+                textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTextColor(Color.parseColor("#C62828"))
+                setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, 0)
+            }
+            dialogBinding.llDetailItems.addView(expensesTotal)
         }
 
         val totalDiff = entry.totalChiffres
