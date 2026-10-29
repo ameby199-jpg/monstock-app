@@ -39,6 +39,9 @@ class ReportsFragment : Fragment() {
     private var _binding: FragmentReportsBinding? = null
     private val binding get() = _binding!!
     private var listener: ListenerRegistration? = null
+    private var ingredientsListener: ListenerRegistration? = null
+    // Bénéfice "Aujourd'hui" = total BNF live de l'Inventaire (avant même de cliquer ⛓️), sur demande explicite.
+    private var liveIngredientsChiffres: Double = 0.0
     private var latestSalesToday: List<Sale> = emptyList()
     private var latestSalesWeek: List<Sale> = emptyList()
     private var latestSalesMonth: List<Sale> = emptyList()
@@ -124,6 +127,11 @@ class ReportsFragment : Fragment() {
             onResult = { entries -> ingredientHistoryEntries = entries; renderProfits() },
             onError = { }
         )
+
+        ingredientsListener = repo.listenIngredients { ingredients ->
+            liveIngredientsChiffres = ingredients.sumOf { it.chiffreValue }
+            renderProfits()
+        }
     }
 
     /** Somme des BNF (Inventaire, bouton ⛓️) enregistrés depuis [sinceMillis]. */
@@ -288,7 +296,7 @@ class ReportsFragment : Fragment() {
 
     private fun renderProfits() {
         if (profitVisible) {
-            binding.tvTodayProfit.text = CurrencyFormatter.format(profit(latestSalesToday))
+            binding.tvTodayProfit.text = CurrencyFormatter.format(liveIngredientsChiffres)
             binding.tvWeekProfit.text = CurrencyFormatter.format(inventoryProfit(startOfWeekMillis))
             binding.tvMonthProfit.text = CurrencyFormatter.format(inventoryProfit(startOfMonthMillis))
         } else {
@@ -542,6 +550,7 @@ class ReportsFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         listener?.remove()
+        ingredientsListener?.remove()
         _binding = null
     }
 }
