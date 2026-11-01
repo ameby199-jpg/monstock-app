@@ -34,6 +34,17 @@ import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.ShopPrefs
 import java.util.Calendar
 
+/** Une période (jour, semaine lundi→dimanche ou mois) regroupant des journées enregistrées via ⛓️ (💾). */
+private data class PeriodStats(
+    val label: String,
+    val startMillis: Long,
+    val entries: List<IngredientHistoryEntry>
+) {
+    val profit: Double get() = entries.sumOf { it.totalChiffres }
+    val expenses: Double get() = entries.sumOf { it.totalExpenses }
+    val net: Double get() = profit - expenses
+}
+
 class ReportsFragment : Fragment() {
 
     private var _binding: FragmentReportsBinding? = null
@@ -107,6 +118,8 @@ class ReportsFragment : Fragment() {
             binding.btnManageEmployees.setOnClickListener { showEmployeesDialog(repo) }
             binding.btnClientAnalysis.visibility = View.VISIBLE
             binding.btnClientAnalysis.setOnClickListener { requireSecureAccess { renderClientAnalysis() } }
+            binding.btnHistoryReport.visibility = View.VISIBLE
+            binding.btnHistoryReport.setOnClickListener { requireSecureAccess { showHistoryReportMenu() } }
         }
 
         val profitClick = View.OnClickListener { toggleProfitVisibility() }
@@ -224,6 +237,212 @@ class ReportsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("📊 Analyse clients")
             .setMessage(sb.toString())
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
+    // ---------- Rapport historique : bénéfices et dépenses enregistrés dans 💾 (via ⛓️) ----------
+
+    private fun dayStartOf(ts: Long): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = ts
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    /** Premier jour du mois (le 1er) à minuit. */
+    private fun monthStartOf(ts: Long): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = dayStartOf(ts)
+        cal.set(Calendar.DAY_OF_MONTH, 1)
+        return cal.timeInMillis
+    }
+
+    /** Lundi de la semaine (lundi → dimanche) à minuit. */
+    private fun weekStartOf(ts: Long): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = dayStartOf(ts)
+        val dow = cal.get(Calendar.DAY_OF_WEEK) // dimanche = 1 ... samedi = 7
+        val daysSinceMonday = if (dow == Calendar.SUNDAY) 6 else dow - Calendar.MONDAY
+        cal.add(Calendar.DAY_OF_MONTH, -daysSinceMonday)
+        return cal.timeInMillis
+    }
+
+    private fun signedProfit(v: Double): String =
+        if (v >= 0) "BNF ${CurrencyFormatter.format(v)}" else "− ${CurrencyFormatter.format(kotlin.math.abs(v))}"
+
+    private fun signedPlain(v: Double): String =
+        if (v >= 0) CurrencyFormatter.format(v) else "− ${CurrencyFormatter.format(kotlin.math.abs(v))}"
+
+    private fun buildPeriods(kind: String): List<PeriodStats> {
+        val monthFmt = SimpleDateFormat("MMMM yyyy", Locale.FRENCH)
+        val dayMonthFmt = SimpleDateFormat("dd/MM", Locale.FRENCH)
+        val grouped = ingredientHistoryEntries.groupBy {
+            if (kind == "month") monthStartOf(it.timestamp) else weekStartOf(it.timestamp)
+        }
+        return grouped.map { (start, entries) ->
+            val label = if (kind == "month") {
+                monthFmt.format(Date(start)).replaceFirstChar { it.uppercase() }
+            } else {
+                val cal = Calendar.getInstance()
+                cal.timeInMillis = start
+                cal.add(Calendar.DAY_OF_MONTH, 6)
+                "Semaine du ${dayMonthFmt.format(Date(start))} au ${dayMonthFmt.format(cal.time)}"
+            }
+            PeriodStats(label, start, entries)
+        }.sortedByDescending { it.startMillis }
+    }
+
+    private fun buildDays(): List<PeriodStats> {
+        val dayFmt = SimpleDateFormat("EEEE dd/MM/yyyy", Locale.FRENCH)
+        return ingredientHistoryEntries.groupBy { dayStartOf(it.timestamp) }.map { (start, entries) ->
+            PeriodStats(dayFmt.format(Date(start)).replaceFirstChar { it.uppercase() }, start, entries)
+        }.sortedByDescending { it.startMillis }
+    }
+
+    private fun showHistoryReportMenu() {
+        if (ingredientHistoryEntries.isEmpty()) {
+            android.widget.Toast.makeText(requireContext(), "Aucune journée enregistrée dans 💾 pour l'instant.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val options = arrayOf(
+            "📅 Par mois (du 1er à la fin du mois)",
+            "🗓 Par semaine (lundi → dimanche)",
+            "🏆 Meilleurs mois",
+            "🏆 Meilleures semaines",
+            "🏆 Meilleurs jours"
+        )
+        AlertDialog.Builder(requireContext())
+            .setTitle("📈 Rapport historique")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showPeriodList("Rapport par mois", buildPeriods("month"))
+                    1 -> showPeriodList("Rapport par semaine", buildPeriods("week"))
+                    2 -> showPeriodList("🏆 Meilleurs mois", buildPeriods("month").sortedByDescending { it.net }.take(12))
+                    3 -> showPeriodList("🏆 Meilleures semaines", buildPeriods("week").sortedByDescending { it.net }.take(12))
+                    else -> showPeriodList("🏆 Meilleurs jours", buildDays().sortedByDescending { it.net }.take(15))
+                }
+            }
+            .setNegativeButton("Fermer", null)
+            .show()
+    }
+
+    /** Liste de périodes (cartes cliquables) : bénéfice, dépenses et net ; 🏆 sur la plus rentable. */
+    private fun showPeriodList(title: String, periods: List<PeriodStats>) {
+        val density = resources.displayMetrics.density
+        val bestNet = periods.maxOfOrNull { it.net }
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val p = (16 * density).toInt()
+            setPadding(p, p, p, 0)
+        }
+        periods.forEach { period ->
+            val card = android.widget.LinearLayout(requireContext()).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (6 * density).toInt() }
+                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                setBackgroundColor(android.graphics.Color.parseColor("#F2F2F2"))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { showPeriodDetail(period) }
+            }
+            val crown = if (periods.size > 1 && period.net == bestNet) "🏆 " else ""
+            val titleView = android.widget.TextView(requireContext()).apply {
+                text = crown + period.label
+                textSize = 15f
+                setTextColor(android.graphics.Color.parseColor("#222222"))
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+            val statsView = android.widget.TextView(requireContext()).apply {
+                text = "${signedProfit(period.profit)} • 💰 Dépenses : ${CurrencyFormatter.format(period.expenses)}\nNet après dépenses : ${signedPlain(period.net)}"
+                textSize = 13f
+                setTextColor(
+                    if (period.net >= 0) android.graphics.Color.parseColor("#2E7D32")
+                    else android.graphics.Color.parseColor("#C62828")
+                )
+            }
+            card.addView(titleView)
+            card.addView(statsView)
+            container.addView(card)
+        }
+        val scroll = android.widget.ScrollView(requireContext()).apply { addView(container) }
+        AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setView(scroll)
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
+    /** Détail d'une période : résumé, meilleur jour, puis chaque journée avec ses dépenses et leurs notes. */
+    private fun showPeriodDetail(period: PeriodStats) {
+        val density = resources.displayMetrics.density
+        val dayFmt = SimpleDateFormat("EEEE dd/MM", Locale.FRENCH)
+        val byDay = period.entries.groupBy { dayStartOf(it.timestamp) }.toSortedMap(compareByDescending { it })
+
+        fun card(): android.widget.LinearLayout = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (6 * density).toInt() }
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            setBackgroundColor(android.graphics.Color.parseColor("#F2F2F2"))
+        }
+        fun text(value: String, size: Float, color: String, bold: Boolean = false) =
+            android.widget.TextView(requireContext()).apply {
+                this.text = value
+                textSize = size
+                setTextColor(android.graphics.Color.parseColor(color))
+                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val p = (16 * density).toInt()
+            setPadding(p, p, p, 0)
+        }
+
+        // Résumé de la période
+        val summary = card()
+        summary.addView(text("Bénéfice : ${signedProfit(period.profit)}", 15f, "#222222", true))
+        summary.addView(text("Dépenses : ${CurrencyFormatter.format(period.expenses)}", 14f, "#C62828"))
+        summary.addView(text(
+            "Net après dépenses : ${signedPlain(period.net)}", 14f,
+            if (period.net >= 0) "#2E7D32" else "#C62828", true
+        ))
+        summary.addView(text("Journées enregistrées : ${byDay.size}", 13f, "#666666"))
+        val bestDay = byDay.maxByOrNull { (_, es) -> es.sumOf { it.totalChiffres - it.totalExpenses } }
+        if (bestDay != null && byDay.size > 1) {
+            val bestNet = bestDay.value.sumOf { it.totalChiffres - it.totalExpenses }
+            val bestLabel = dayFmt.format(Date(bestDay.key)).replaceFirstChar { it.uppercase() }
+            summary.addView(text("🏆 Meilleur jour : $bestLabel (${signedPlain(bestNet)})", 13f, "#222222", true))
+        }
+        container.addView(summary)
+
+        // Chaque journée, avec ses dépenses et la note de chacune
+        byDay.forEach { (dayMillis, es) ->
+            val profit = es.sumOf { it.totalChiffres }
+            val expenses = es.sumOf { it.totalExpenses }
+            val dayCard = card()
+            dayCard.addView(text("📅 " + dayFmt.format(Date(dayMillis)).replaceFirstChar { it.uppercase() }, 14f, "#222222", true))
+            dayCard.addView(text(
+                "${signedProfit(profit)} • 💰 Dépenses : ${CurrencyFormatter.format(expenses)}", 13f,
+                if (profit >= 0) "#2E7D32" else "#C62828"
+            ))
+            es.flatMap { it.expenses }.forEach { expense ->
+                dayCard.addView(text("   • ${expense.note} — ${CurrencyFormatter.format(expense.amount)}", 12f, "#666666"))
+            }
+            container.addView(dayCard)
+        }
+
+        val scroll = android.widget.ScrollView(requireContext()).apply { addView(container) }
+        AlertDialog.Builder(requireContext())
+            .setTitle(period.label)
+            .setView(scroll)
             .setPositiveButton("Fermer", null)
             .show()
     }

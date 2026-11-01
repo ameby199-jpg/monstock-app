@@ -61,6 +61,17 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/btnHistoryReport"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:text="📈 Rapport historique (bénéfices, dépenses)"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                android:padding="8dp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/btnResetReports"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
