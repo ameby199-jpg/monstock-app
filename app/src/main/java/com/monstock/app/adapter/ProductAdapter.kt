@@ -29,7 +29,7 @@ class ProductAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val product = items[position]
-        holder.binding.tvName.text = product.name
+        holder.binding.tvName.text = if (product.isDerived) "${product.name} 🧩" else product.name
         holder.binding.tvDetails.text = "Qté: ${product.quantity}  •  ${CurrencyFormatter.format(product.price)}"
         holder.binding.tvComposants.text = if (product.composants.isBlank()) {
             "Composants : appuyer pour renseigner"

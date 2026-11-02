@@ -161,17 +161,18 @@ class StockFragment : Fragment() {
             Glide.with(dialogBinding.ivPhotoPreview).load(bmp).centerCrop().into(dialogBinding.ivPhotoPreview)
         }
         dialogBinding.btnAddPhoto.setOnClickListener { showPhotoSourceChooser(null) }
+        val derivedForm = attachDerivedCheckbox(dialogBinding, false)
 
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.add_product)
-            .setView(dialogBinding.root)
+            .setView(derivedForm.first)
             .setPositiveButton(R.string.save) { _, _ ->
                 val name = dialogBinding.etName.text.toString().trim()
                 val qty = dialogBinding.etQuantity.text.toString().toLongOrNull() ?: 0L
                 val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: 0.0
                 val costPrice = dialogBinding.etCostPrice.text.toString().toDoubleOrNull() ?: 0.0
                 if (name.isNotEmpty()) {
-                    repo.addProduct(name, qty, price, costPrice, pendingPhoto) { msg ->
+                    repo.addProduct(name, qty, price, costPrice, pendingPhoto, derivedForm.second.isChecked) { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
@@ -179,6 +180,36 @@ class StockFragment : Fragment() {
             }
             .setNegativeButton(R.string.cancel) { _, _ -> dialogPreviewSetter = null }
             .show()
+    }
+
+    /**
+     * Ajoute la case « Dérivé » juste sous le nom du produit. Un produit dérivé (supplément : sauce,
+     * boisson, extra...) reste visible dans Accueil comme les autres, et peut aussi être ajouté depuis
+     * la fenêtre de vente. Renvoie la vue à afficher dans la boîte de dialogue et la case elle-même.
+     */
+    private fun attachDerivedCheckbox(
+        form: DialogAddProductBinding,
+        initiallyDerived: Boolean
+    ): Pair<View, android.widget.CheckBox> {
+        val check = android.widget.CheckBox(requireContext()).apply {
+            text = "🧩 Dérivé (supplément proposé à la vente)"
+            isChecked = initiallyDerived
+            textSize = 14f
+        }
+        val parent = form.etName.parent
+        if (parent is android.widget.LinearLayout && parent.orientation == android.widget.LinearLayout.VERTICAL) {
+            parent.addView(check, parent.indexOfChild(form.etName) + 1)
+            return form.root to check
+        }
+        // Mise en page inattendue : on place la case sous le formulaire plutôt que de la perdre.
+        val wrapper = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(form.root)
+            val side = (24 * resources.displayMetrics.density).toInt()
+            check.setPadding(side, 0, side, 0)
+            addView(check)
+        }
+        return wrapper to check
     }
 
     /** Modification d'un produit déjà existant : mêmes champs que l'ajout, pré-remplis. */
@@ -198,17 +229,18 @@ class StockFragment : Fragment() {
             Glide.with(dialogBinding.ivPhotoPreview).load(bmp).centerCrop().into(dialogBinding.ivPhotoPreview)
         }
         dialogBinding.btnAddPhoto.setOnClickListener { showPhotoSourceChooser(null) }
+        val derivedForm = attachDerivedCheckbox(dialogBinding, product.isDerived)
 
         AlertDialog.Builder(requireContext())
             .setTitle("Modifier : ${product.name}")
-            .setView(dialogBinding.root)
+            .setView(derivedForm.first)
             .setPositiveButton(R.string.save) { _, _ ->
                 val name = dialogBinding.etName.text.toString().trim()
                 val qty = dialogBinding.etQuantity.text.toString().toLongOrNull() ?: product.quantity
                 val price = dialogBinding.etPrice.text.toString().toDoubleOrNull() ?: product.price
                 val costPrice = dialogBinding.etCostPrice.text.toString().toDoubleOrNull() ?: product.costPrice
                 if (name.isNotEmpty()) {
-                    repo.updateProduct(product.id, name, qty, price, costPrice, pendingPhoto) { msg ->
+                    repo.updateProduct(product.id, name, qty, price, costPrice, pendingPhoto, derivedForm.second.isChecked) { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
@@ -236,6 +268,7 @@ class StockFragment : Fragment() {
         // Stock ne propose pas la commande/panier (reserve a l'Accueil) : boutons masques.
         dialogBinding.btnOrderSingle.visibility = View.GONE
         dialogBinding.btnAddToCart.visibility = View.GONE
+        dialogBinding.llDerivedColumn.visibility = View.GONE
 
         var selectedProfile = "👨🏿"
         val profileViews = listOf(

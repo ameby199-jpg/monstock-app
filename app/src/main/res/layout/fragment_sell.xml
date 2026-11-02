@@ -27,6 +27,33 @@
         android:textColor="#888888"
         android:visibility="gone" />
 
+    <LinearLayout
+        android:id="@+id/llAlphaIndex"
+        android:layout_width="26dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="2dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingVertical="6dp"
+        android:background="@drawable/bg_alpha_index"
+        android:elevation="6dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvAlphaBubble"
+        android:layout_width="76dp"
+        android:layout_height="76dp"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:textSize="38sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:background="@drawable/dot_shape"
+        android:backgroundTint="#CC000000"
+        android:elevation="10dp"
+        android:visibility="gone" />
+
     <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

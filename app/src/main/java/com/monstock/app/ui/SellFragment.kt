@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -55,6 +56,9 @@ class SellFragment : Fragment() {
     private var salesCountByProductId: Map<String, Long> = emptyMap()
     private var latestOrders: List<Order> = emptyList()
 
+    // Index alphabétique : (lettre, position du premier produit de cette lettre dans la grille affichée).
+    private var alphaPositions: List<Pair<String, Int>> = emptyList()
+
     // Panier en cours de construction : plusieurs produits peuvent être ajoutés avant de
     // valider la commande en une seule fois.
     private val draftCart = mutableListOf<OrderLine>()
@@ -95,6 +99,7 @@ class SellFragment : Fragment() {
         adapter = SellProductAdapter(emptyList()) { showSellDialog(it) }
         binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
         binding.recyclerView.adapter = adapter
+        setupAlphaIndexTouch()
 
         productsListener = repo.listenProducts { products ->
             latestProducts = products
@@ -129,6 +134,85 @@ class SellFragment : Fragment() {
         )
         adapter.updateData(sorted)
         binding.tvEmpty.visibility = if (sorted.isEmpty()) View.VISIBLE else View.GONE
+        updateAlphaIndex(sorted)
+    }
+
+    /** Première lettre du nom, sans accent et en majuscule ("Norvège" -> "N", "épices" -> "E"). */
+    private fun initialOf(name: String): String {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return "#"
+        val decomposed = java.text.Normalizer.normalize(trimmed.substring(0, 1), java.text.Normalizer.Form.NFD)
+        val c = decomposed.firstOrNull { it.isLetterOrDigit() } ?: return "#"
+        return c.uppercaseChar().toString()
+    }
+
+    /**
+     * Raccourcis à droite de la grille : seulement les lettres par lesquelles commencent les produits
+     * (pas de A à Z complet). Toucher ou glisser le doigt sur une lettre saute au premier produit
+     * qui commence par cette lettre.
+     */
+    private fun updateAlphaIndex(sorted: List<Product>) {
+        val firstPositions = linkedMapOf<String, Int>()
+        sorted.forEachIndexed { index, product ->
+            val letter = initialOf(product.name)
+            if (!firstPositions.containsKey(letter)) firstPositions[letter] = index
+        }
+        alphaPositions = firstPositions.entries.sortedBy { it.key }.map { it.key to it.value }
+
+        val strip = binding.llAlphaIndex
+        strip.removeAllViews()
+        if (alphaPositions.size < 2) {
+            strip.visibility = View.GONE
+            return
+        }
+        val density = resources.displayMetrics.density
+        alphaPositions.forEach { (letter, _) ->
+            strip.addView(TextView(requireContext()).apply {
+                text = letter
+                textSize = 11f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(0, (2 * density).toInt(), 0, (2 * density).toInt())
+            })
+        }
+        strip.visibility = View.VISIBLE
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupAlphaIndexTouch() {
+        val strip = binding.llAlphaIndex
+        strip.setOnTouchListener { v, event ->
+            if (alphaPositions.isEmpty()) return@setOnTouchListener false
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    val height = v.height.toFloat().coerceAtLeast(1f)
+                    val index = ((event.y / height) * alphaPositions.size).toInt()
+                        .coerceIn(0, alphaPositions.size - 1)
+                    val (letter, position) = alphaPositions[index]
+                    (binding.recyclerView.layoutManager as? GridLayoutManager)
+                        ?.scrollToPositionWithOffset(position, 0)
+                    binding.tvAlphaBubble.text = letter
+                    binding.tvAlphaBubble.visibility = View.VISIBLE
+                    for (i in 0 until strip.childCount) {
+                        (strip.getChildAt(i) as? TextView)
+                            ?.setTextColor(if (i == index) Color.parseColor("#FFC107") else Color.WHITE)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    binding.tvAlphaBubble.visibility = View.GONE
+                    for (i in 0 until strip.childCount) {
+                        (strip.getChildAt(i) as? TextView)?.setTextColor(Color.WHITE)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun updateCartButton() {
@@ -166,11 +250,62 @@ class SellFragment : Fragment() {
         }
         profileViews.forEach { view -> view.setOnClickListener { selectProfile(view) } }
 
+        // Produits dérivés (suppléments) : on peut les parcourir et les ajouter ici, sans quitter la
+        // fenêtre ni passer par le panier. Touche = +1 (dans la limite du stock), appui long = retirer.
+        val derivedCounts = mutableMapOf<String, Long>()
+        val derivedProducts = latestProducts
+            .filter { it.isDerived && it.quantity > 0 && it.id != product.id }
+            .sortedBy { it.name.lowercase() }
+
+        fun derivedTotal(): Double = derivedProducts.sumOf { (derivedCounts[it.id] ?: 0L) * it.price }
+
         fun updateTotal() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
-            dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price)}"
+            dialogBinding.tvTotalPrice.text = "Total : ${CurrencyFormatter.format(qty * product.price + derivedTotal())}"
         }
         updateTotal()
+
+        val density = resources.displayMetrics.density
+        fun styleDerivedRow(row: TextView, item: Product) {
+            val count = derivedCounts[item.id] ?: 0L
+            val label = if (count > 0) "✓ ×$count  ${item.name}" else item.name
+            row.text = "$label\n${CurrencyFormatter.format(item.price)}"
+            row.setBackgroundColor(Color.parseColor(if (count > 0) "#554CAF50" else "#22FFFFFF"))
+        }
+        if (derivedProducts.isEmpty()) {
+            dialogBinding.llDerivedList.addView(TextView(requireContext()).apply {
+                text = "Aucun dérivé pour l'instant. Coche « Dérivé » sur un produit dans Stock."
+                textSize = 10f
+                setTextColor(Color.parseColor("#9E9E9E"))
+            })
+        }
+        derivedProducts.forEach { item ->
+            val row = TextView(requireContext()).apply {
+                textSize = 12f
+                setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (4 * density).toInt() }
+            }
+            styleDerivedRow(row, item)
+            row.setOnClickListener {
+                val current = derivedCounts[item.id] ?: 0L
+                if (current < item.quantity) {
+                    derivedCounts[item.id] = current + 1
+                    styleDerivedRow(row, item)
+                    updateTotal()
+                } else {
+                    android.widget.Toast.makeText(requireContext(), "Stock maximum atteint pour ${item.name}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            row.setOnLongClickListener {
+                derivedCounts.remove(item.id)
+                styleDerivedRow(row, item)
+                updateTotal()
+                true
+            }
+            dialogBinding.llDerivedList.addView(row)
+        }
 
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L
@@ -198,25 +333,46 @@ class SellFragment : Fragment() {
             else -> "Espèces"
         }
 
+        fun derivedLines(): List<OrderLine> = derivedProducts.mapNotNull { item ->
+            val count = derivedCounts[item.id] ?: 0L
+            if (count > 0) OrderLine(item.id, item.name, count, item.price, item.costPrice, selectedProfile, currentPaymentMethod()) else null
+        }
+        fun extrasLabel(): String {
+            val n = derivedCounts.values.sum()
+            return if (n > 0) " + $n dérivé(s)" else ""
+        }
+
         dialogBinding.btnSellNow.setOnClickListener {
             val qtySold = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             val paymentMethod = currentPaymentMethod()
             if (qtySold in 1..product.quantity) {
+                val employee = EmployeeSession.getCurrentName(requireContext())
+                val onSaleError: (String) -> Unit = { msg ->
+                    android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+                }
                 repo.recordSale(
                     product, qtySold, paymentMethod,
-                    employeeName = EmployeeSession.getCurrentName(requireContext()),
+                    employeeName = employee,
                     customerProfile = selectedProfile,
-                    onError = { msg ->
-                        android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-                    },
-                    onSuccess = {
-                        android.widget.Toast.makeText(
-                            requireContext(),
-                            "✅ Vente réussie : ${product.name} x$qtySold",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                    }
+                    onError = onSaleError
                 )
+                // Chaque dérivé sélectionné est vendu avec le même client, le même paiement et le même employé.
+                derivedProducts.forEach { item ->
+                    val count = derivedCounts[item.id] ?: 0L
+                    if (count in 1..item.quantity) {
+                        repo.recordSale(
+                            item, count, paymentMethod,
+                            employeeName = employee,
+                            customerProfile = selectedProfile,
+                            onError = onSaleError
+                        )
+                    }
+                }
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "✅ Vente réussie : ${product.name} x$qtySold${extrasLabel()}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
                 dialog.dismiss()
             }
         }
@@ -226,14 +382,14 @@ class SellFragment : Fragment() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
                 repo.addOrder(
-                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile, currentPaymentMethod())),
+                    listOf(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile, currentPaymentMethod())) + derivedLines(),
                     onError = { msg ->
                         android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                     },
                     onSuccess = {
                         android.widget.Toast.makeText(
                             requireContext(),
-                            "✅ Commande enregistrée : ${product.name} x$qty",
+                            "✅ Commande enregistrée : ${product.name} x$qty${extrasLabel()}",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                     }
@@ -247,10 +403,11 @@ class SellFragment : Fragment() {
             val qty = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 0L
             if (qty in 1..product.quantity) {
                 draftCart.add(OrderLine(product.id, product.name, qty, product.price, product.costPrice, selectedProfile, currentPaymentMethod()))
+                draftCart.addAll(derivedLines())
                 updateCartButton()
                 android.widget.Toast.makeText(
                     requireContext(),
-                    "🛒 Ajouté au panier : ${product.name} x$qty",
+                    "🛒 Ajouté au panier : ${product.name} x$qty${extrasLabel()}",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
                 dialog.dismiss()

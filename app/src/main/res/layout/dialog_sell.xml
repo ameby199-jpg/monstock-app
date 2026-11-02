@@ -120,15 +120,26 @@
 
     </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Mode de paiement"
-        android:textStyle="bold"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="8dp" />
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
 
-    <RadioGroup
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mode de paiement"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
         android:id="@+id/rgPayment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -162,6 +173,47 @@
             android:padding="8dp" />
 
     </RadioGroup>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/llDerivedColumn"
+            android:layout_width="128dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🧩 Dérivés"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Touche : +1 · Appui long : retirer"
+                android:textSize="9sp"
+                android:textColor="#9E9E9E" />
+
+            <ScrollView
+                android:id="@+id/svDerived"
+                android:layout_width="match_parent"
+                android:layout_height="132dp"
+                android:layout_marginTop="6dp"
+                android:fadeScrollbars="false"
+                android:scrollbarStyle="outsideOverlay">
+
+                <LinearLayout
+                    android:id="@+id/llDerivedList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+        </LinearLayout>
+
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnSellNow"

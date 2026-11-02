@@ -49,6 +49,7 @@ class FirebaseRepo(private val shopCode: String) {
                         costPrice = d.getDouble("costPrice") ?: 0.0,
                         photoBase64 = d.getString("photoBase64") ?: "",
                         composants = d.getString("composants") ?: "",
+                        isDerived = d.getBoolean("isDerived") ?: false,
                         ownerId = shopCode
                     )
                 }
@@ -62,13 +63,15 @@ class FirebaseRepo(private val shopCode: String) {
         price: Double,
         costPrice: Double = 0.0,
         photo: Bitmap? = null,
+        isDerived: Boolean = false,
         onError: (String) -> Unit = {}
     ) {
         val data = hashMapOf<String, Any>(
             "name" to name,
             "quantity" to quantity,
             "price" to price,
-            "costPrice" to costPrice
+            "costPrice" to costPrice,
+            "isDerived" to isDerived
         )
         if (photo != null) {
             data["photoBase64"] = compressToBase64(photo)
@@ -85,13 +88,15 @@ class FirebaseRepo(private val shopCode: String) {
         price: Double,
         costPrice: Double,
         photo: Bitmap? = null,
+        isDerived: Boolean = false,
         onError: (String) -> Unit = {}
     ) {
         val data = hashMapOf<String, Any>(
             "name" to name,
             "quantity" to quantity,
             "price" to price,
-            "costPrice" to costPrice
+            "costPrice" to costPrice,
+            "isDerived" to isDerived
         )
         if (photo != null) {
             data["photoBase64"] = compressToBase64(photo)
