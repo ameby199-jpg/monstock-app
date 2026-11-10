@@ -58,6 +58,11 @@ class SellFragment : Fragment() {
 
     // Index alphabétique : (lettre, position du premier produit de cette lettre dans la grille affichée).
     private var alphaPositions: List<Pair<String, Int>> = emptyList()
+    private val alphaPalette = listOf(
+        "#FF5252", "#FFAB40", "#FFEB3B", "#69F0AE", "#40C4FF",
+        "#B388FF", "#FF80AB", "#18FFFF", "#B2FF59", "#FF9E80"
+    )
+    private fun alphaColor(i: Int): Int = Color.parseColor(alphaPalette[i % alphaPalette.size])
 
     // Panier en cours de construction : plusieurs produits peuvent être ajoutés avant de
     // valider la commande en une seule fois.
@@ -166,17 +171,20 @@ class SellFragment : Fragment() {
             return
         }
         val density = resources.displayMetrics.density
-        alphaPositions.forEach { (letter, _) ->
+        // Beaucoup de lettres : on réduit un peu la taille pour que la bande tienne à l'écran.
+        val letterSize = if (alphaPositions.size > 14) 12f else 16f
+        val letterPad = if (alphaPositions.size > 14) 2 else 5
+        alphaPositions.forEachIndexed { i, (letter, _) ->
             strip.addView(TextView(requireContext()).apply {
                 text = letter
-                textSize = 11f
+                textSize = letterSize
                 gravity = android.view.Gravity.CENTER
-                setTextColor(Color.WHITE)
+                setTextColor(alphaColor(i))
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                setPadding(0, (2 * density).toInt(), 0, (2 * density).toInt())
+                setPadding(0, (letterPad * density).toInt(), 0, (letterPad * density).toInt())
             })
         }
         strip.visibility = View.VISIBLE
@@ -196,17 +204,24 @@ class SellFragment : Fragment() {
                     (binding.recyclerView.layoutManager as? GridLayoutManager)
                         ?.scrollToPositionWithOffset(position, 0)
                     binding.tvAlphaBubble.text = letter
+                    binding.tvAlphaBubble.backgroundTintList =
+                        android.content.res.ColorStateList.valueOf(alphaColor(index))
                     binding.tvAlphaBubble.visibility = View.VISIBLE
                     for (i in 0 until strip.childCount) {
-                        (strip.getChildAt(i) as? TextView)
-                            ?.setTextColor(if (i == index) Color.parseColor("#FFC107") else Color.WHITE)
+                        (strip.getChildAt(i) as? TextView)?.apply {
+                            setTextColor(if (i == index) Color.WHITE else alphaColor(i))
+                            textSize = if (i == index) 22f else (if (alphaPositions.size > 14) 12f else 16f)
+                        }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     binding.tvAlphaBubble.visibility = View.GONE
                     for (i in 0 until strip.childCount) {
-                        (strip.getChildAt(i) as? TextView)?.setTextColor(Color.WHITE)
+                        (strip.getChildAt(i) as? TextView)?.apply {
+                            setTextColor(alphaColor(i))
+                            textSize = if (alphaPositions.size > 14) 12f else 16f
+                        }
                     }
                     true
                 }
@@ -253,9 +268,12 @@ class SellFragment : Fragment() {
         // Produits dérivés (suppléments) : on peut les parcourir et les ajouter ici, sans quitter la
         // fenêtre ni passer par le panier. Touche = +1 (dans la limite du stock), appui long = retirer.
         val derivedCounts = mutableMapOf<String, Long>()
+        // Tous les articles ajoutables en plus du produit principal : dérivés ET produits normaux,
+        // rangés dans deux onglets (🧩 Dérivés / 🛍️ Produits), avec les mêmes quantités partagées.
         val derivedProducts = latestProducts
-            .filter { it.isDerived && it.quantity > 0 && it.id != product.id }
+            .filter { it.quantity > 0 && it.id != product.id }
             .sortedBy { it.name.lowercase() }
+        var showDerivedTab = true
 
         fun derivedTotal(): Double = derivedProducts.sumOf { (derivedCounts[it.id] ?: 0L) * it.price }
 
@@ -272,40 +290,56 @@ class SellFragment : Fragment() {
             row.text = "$label\n${CurrencyFormatter.format(item.price)}"
             row.setBackgroundColor(Color.parseColor(if (count > 0) "#554CAF50" else "#22FFFFFF"))
         }
-        if (derivedProducts.isEmpty()) {
-            dialogBinding.llDerivedList.addView(TextView(requireContext()).apply {
-                text = "Aucun dérivé pour l'instant. Coche « Dérivé » sur un produit dans Stock."
-                textSize = 10f
-                setTextColor(Color.parseColor("#9E9E9E"))
-            })
-        }
-        derivedProducts.forEach { item ->
-            val row = TextView(requireContext()).apply {
-                textSize = 12f
-                setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = (4 * density).toInt() }
+        fun renderExtrasList() {
+            val list = dialogBinding.llDerivedList
+            list.removeAllViews()
+            val selectedColor = Color.parseColor("#554CAF50")
+            dialogBinding.tvTabDerived.setBackgroundColor(if (showDerivedTab) selectedColor else Color.parseColor("#22FFFFFF"))
+            dialogBinding.tvTabOthers.setBackgroundColor(if (!showDerivedTab) selectedColor else Color.parseColor("#22FFFFFF"))
+            val shown = derivedProducts.filter { it.isDerived == showDerivedTab }
+            if (shown.isEmpty()) {
+                list.addView(TextView(requireContext()).apply {
+                    text = if (showDerivedTab)
+                        "Aucun dérivé pour l'instant. Coche « Dérivé » sur un produit dans Stock."
+                    else "Aucun autre produit en stock."
+                    textSize = 10f
+                    setTextColor(Color.parseColor("#9E9E9E"))
+                })
+                return
             }
-            styleDerivedRow(row, item)
-            row.setOnClickListener {
-                val current = derivedCounts[item.id] ?: 0L
-                if (current < item.quantity) {
-                    derivedCounts[item.id] = current + 1
+            shown.forEach { item ->
+                val row = TextView(requireContext()).apply {
+                    textSize = 12f
+                    setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (4 * density).toInt() }
+                }
+                styleDerivedRow(row, item)
+                row.setOnClickListener {
+                    val current = derivedCounts[item.id] ?: 0L
+                    if (current < item.quantity) {
+                        derivedCounts[item.id] = current + 1
+                        styleDerivedRow(row, item)
+                        updateTotal()
+                    } else {
+                        android.widget.Toast.makeText(requireContext(), "Stock maximum atteint pour ${item.name}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                row.setOnLongClickListener {
+                    derivedCounts.remove(item.id)
                     styleDerivedRow(row, item)
                     updateTotal()
-                } else {
-                    android.widget.Toast.makeText(requireContext(), "Stock maximum atteint pour ${item.name}", android.widget.Toast.LENGTH_SHORT).show()
+                    true
                 }
+                list.addView(row)
             }
-            row.setOnLongClickListener {
-                derivedCounts.remove(item.id)
-                styleDerivedRow(row, item)
-                updateTotal()
-                true
-            }
-            dialogBinding.llDerivedList.addView(row)
         }
+        dialogBinding.tvTabDerived.setOnClickListener { showDerivedTab = true; renderExtrasList() }
+        dialogBinding.tvTabOthers.setOnClickListener { showDerivedTab = false; renderExtrasList() }
+        // Au départ : l'onglet Dérivés, sauf s'il est vide et qu'il y a d'autres produits.
+        if (derivedProducts.none { it.isDerived } && derivedProducts.isNotEmpty()) showDerivedTab = false
+        renderExtrasList()
 
         dialogBinding.btnMinus.setOnClickListener {
             val current = dialogBinding.etQuantitySold.text.toString().toLongOrNull() ?: 1L
@@ -339,7 +373,7 @@ class SellFragment : Fragment() {
         }
         fun extrasLabel(): String {
             val n = derivedCounts.values.sum()
-            return if (n > 0) " + $n dérivé(s)" else ""
+            return if (n > 0) " + $n article(s) en plus" else ""
         }
 
         dialogBinding.btnSellNow.setOnClickListener {

@@ -29,24 +29,24 @@
 
     <LinearLayout
         android:id="@+id/llAlphaIndex"
-        android:layout_width="26dp"
+        android:layout_width="38dp"
         android:layout_height="wrap_content"
         android:layout_gravity="end|center_vertical"
         android:layout_marginEnd="2dp"
         android:orientation="vertical"
         android:gravity="center_horizontal"
-        android:paddingVertical="6dp"
+        android:paddingVertical="8dp"
         android:background="@drawable/bg_alpha_index"
         android:elevation="6dp"
         android:visibility="gone" />
 
     <TextView
         android:id="@+id/tvAlphaBubble"
-        android:layout_width="76dp"
-        android:layout_height="76dp"
+        android:layout_width="92dp"
+        android:layout_height="92dp"
         android:layout_gravity="center"
         android:gravity="center"
-        android:textSize="38sp"
+        android:textSize="46sp"
         android:textStyle="bold"
         android:textColor="@color/white"
         android:background="@drawable/dot_shape"
