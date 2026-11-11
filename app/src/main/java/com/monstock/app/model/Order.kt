@@ -8,7 +8,10 @@ data class Order(
     var customerName: String = "",
     var customerPhone: String = "",
     var note: String = "",
-    var source: String = ""
+    var source: String = "",
+    // Commande en ligne : identifiant côté web (pour suivre l'état chez le client) et état « prêt ».
+    var onlineId: String = "",
+    var ready: Boolean = false
 )
 
 /** Une ligne d'une commande envoyée par un client depuis la page web (seuls produit + quantité comptent). */

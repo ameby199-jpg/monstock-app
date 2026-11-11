@@ -56,9 +56,14 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
                 }
 
                 r.binding.tvSaleDetails.text = if (sale.fromOrder && sale.orderTimestamp > 0) {
-                    "${CurrencyFormatter.format(sale.total)}  •  Commandé: ${timeFmt.format(Date(sale.orderTimestamp))}  •  Prise: ${timeFmt.format(Date(sale.timestamp))}${employeeSuffix(sale.employeeName)}"
+                    "${CurrencyFormatter.format(sale.total)}  •  Commandé: ${timeFmt.format(Date(sale.orderTimestamp))}  •  Prise: ${timeFmt.format(Date(sale.timestamp))}${employeeSuffix(sale.employeeName)}${customerSuffix(sale)}"
                 } else {
                     "${CurrencyFormatter.format(sale.total)}  •  ${timeFmt.format(Date(sale.timestamp))}${employeeSuffix(sale.employeeName)}"
+                }
+                if (sale.customerName.isNotBlank()) {
+                    r.binding.tvSaleDetails.text = r.binding.tvSaleDetails.text.toString().let { t ->
+                        if (t.contains("🌐")) t else t + customerSuffix(sale)
+                    }
                 }
                 r.binding.tvSalePayment.text = sale.paymentMethod
 
@@ -84,4 +89,11 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
         items = newItems
         notifyDataSetChanged()
     }
+}
+
+/** Pour une vente issue d'une commande en ligne : « 🌐 Nom · téléphone ». */
+private fun customerSuffix(sale: com.monstock.app.model.Sale): String {
+    if (sale.customerName.isBlank() && sale.customerPhone.isBlank()) return ""
+    val phone = if (sale.customerPhone.isNotBlank()) " · ${sale.customerPhone}" else ""
+    return "  •  🌐 ${sale.customerName}$phone"
 }

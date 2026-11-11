@@ -39,11 +39,18 @@ input[type=text],input[type=tel],textarea{width:100%;padding:13px;border-radius:
 .pay label:has(input:checked){border-color:var(--accent)}
 .back{background:none;border:0;color:var(--accent);font-size:16px;font-weight:700;padding:6px 0}
 #err{color:#d32f2f;font-weight:600;margin-top:10px;min-height:20px}
-.done{text-align:center;padding-top:60px}.done .big{font-size:64px}
+#track{display:none;margin:12px;padding:14px;border-radius:14px;background:var(--card);border:2px solid var(--accent)}
+#track .st{font-size:18px;font-weight:800;margin-bottom:4px}
+#track.ready{border-color:var(--ok);background:#2e9e4f22}
+#track button{margin-top:10px;padding:10px 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700}
+#paybox{display:none;margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--accent);background:var(--card);font-size:15px}
+#paybox b{font-size:17px}
+#paybox button{margin:8px 8px 0 0;padding:10px 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:15px}
 </style>
 </head>
 <body>
 <header><h1 id="title">🛒 Commandez ici</h1><div class="sub">Choisissez vos produits puis envoyez votre commande</div></header>
+<div id="track"></div>
 <div id="content"><div class="msg">Chargement…</div></div>
 
 <div id="bar"><button id="openCart"></button></div>
@@ -63,6 +70,11 @@ input[type=text],input[type=tel],textarea{width:100%;padding:13px;border-radius:
     <label><input type="radio" name="pay" value="Orange Money"><span>🟠 Orange Money</span></label>
     <label><input type="radio" name="pay" value="Wave"><span>🔵 Wave</span></label>
   </div>
+  <div id="paybox"></div>
+  <div id="refwrap" style="display:none">
+    <label for="payref">Référence du paiement (facultatif)</label>
+    <input id="payref" type="text" maxlength="40" placeholder="Code reçu par SMS après paiement">
+  </div>
   <label for="note">Précision (facultatif)</label>
   <textarea id="note" rows="2" maxlength="300" placeholder="Ex : sans piment, livraison à Kaloum…"></textarea>
   <div id="err"></div>
@@ -72,7 +84,7 @@ input[type=text],input[type=tel],textarea{width:100%;padding:13px;border-radius:
 <script src="config.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, doc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const $ = id => document.getElementById(id);
 const cfg = window.MONSTOCK_CONFIG || {};
@@ -88,6 +100,77 @@ if (!cfg.apiKey || cfg.apiKey === "A_REMPLIR") { show("Page pas encore configur�
 const db = getFirestore(initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId, appId: cfg.appId }));
 let products = [];
 const cart = {};           // productId -> quantité
+const LS = { get(k){ try { return JSON.parse(localStorage.getItem(k) || "null"); } catch(e){ return null; } },
+             set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} },
+             del(k){ try { localStorage.removeItem(k); } catch(e){} } };
+
+// Remplissage automatique : nom et numéro mémorisés sur CE téléphone après la première commande.
+const saved = LS.get("monstock_client");
+if (saved) { $("name").value = saved.name || ""; $("phone").value = saved.phone || ""; }
+
+// Numéro au format international (WhatsApp) : on ajoute l'indicatif pays si le numéro est local.
+function normPhone(raw){
+  let d = String(raw).replace(/\D/g, "").replace(/^00/, "");
+  const cc = String(cfg.countryCode || "").replace(/\D/g, "");
+  if (cc && d.length <= 9) d = cc + d;
+  return d;
+}
+
+// Paiement à distance : affiche le numéro Wave / Orange Money de la boutique (ou un lien de paiement).
+function updatePayBox(){
+  const m = document.querySelector("input[name=pay]:checked").value;
+  const box = $("paybox"), info = (cfg.payments || {})[m];
+  $("refwrap").style.display = (m !== "Espèces") ? "block" : "none";
+  if (m === "Espèces" || !info || (!info.number && !info.link)) { box.style.display = "none"; return; }
+  const total = totals().t;
+  box.innerHTML = "";
+  const t = document.createElement("div");
+  t.append("Payez " );
+  const b = document.createElement("b"); b.textContent = fmt(total); t.appendChild(b);
+  if (info.number) { t.append(" par " + m + " au "); const n = document.createElement("b"); n.textContent = info.number; t.appendChild(n); }
+  t.append(", puis envoyez votre commande.");
+  box.appendChild(t);
+  if (info.link) {
+    const a = document.createElement("button"); a.textContent = "💳 Payer avec " + m;
+    a.onclick = () => { location.href = info.link.replace("{amount}", Math.round(total)); };
+    box.appendChild(a);
+  }
+  if (info.number) {
+    const c = document.createElement("button"); c.textContent = "📋 Copier le numéro";
+    c.onclick = async () => { try { await navigator.clipboard.writeText(info.number); c.textContent = "✅ Copié"; } catch(e){ c.textContent = info.number; } };
+    box.appendChild(c);
+  }
+  box.style.display = "block";
+}
+document.querySelectorAll("input[name=pay]").forEach(r => r.addEventListener("change", updatePayBox));
+
+// Suivi de la commande en direct : reçue -> prête.
+let unsubTrack = null;
+function track(id){
+  const el = $("track"); el.style.display = "block";
+  if (unsubTrack) unsubTrack();
+  const draw = state => {
+    el.className = state === "ready" ? "ready" : "";
+    el.innerHTML = "";
+    const st = document.createElement("div"); st.className = "st";
+    const sub = document.createElement("div"); sub.className = "sub";
+    if (state === "ready") { st.textContent = "✅ Votre commande est PRÊTE !"; sub.textContent = "Vous pouvez venir la récupérer."; try { navigator.vibrate && navigator.vibrate([200,100,200,100,400]); } catch(e){} document.title = "✅ Commande prête"; }
+    else if (state === "received") { st.textContent = "👨‍🍳 Commande reçue, en préparation…"; sub.textContent = "Gardez cette page ouverte : elle vous prévient quand c'est prêt."; }
+    else if (state === "cancelled") { st.textContent = "❌ Commande annulée"; sub.textContent = "Contactez la boutique pour plus d'informations."; }
+    else if (state === "done") { st.textContent = "🎉 Commande remise. Merci !"; sub.textContent = ""; }
+    else { st.textContent = "⏳ Commande envoyée…"; sub.textContent = "En attente de la boutique."; }
+    el.append(st, sub);
+    if (state === "done" || state === "cancelled") {
+      const bt = document.createElement("button"); bt.textContent = "Nouvelle commande";
+      bt.onclick = () => { LS.del("monstock_last"); el.style.display = "none"; if (unsubTrack) unsubTrack(); };
+      el.appendChild(bt);
+    }
+  };
+  draw("sent");
+  unsubTrack = onSnapshot(doc(db, "catalogs", pid, "status", id), snap => { if (snap.exists()) draw(snap.data().state); }, () => {});
+}
+const last = LS.get("monstock_last");
+if (last && last.pid === pid && last.id && Date.now() - (last.t || 0) < 12 * 3600 * 1000) track(last.id);
 
 onSnapshot(collection(db, "catalogs", pid, "products"), snap => {
   products = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -158,6 +241,7 @@ $("openCart").onclick = () => {
   }
   $("total").textContent = "Total : " + fmt(totals().t);
   $("err").textContent = "";
+  updatePayBox();
   $("sheet").style.display = "block";
   window.scrollTo(0, 0);
 };
@@ -165,23 +249,28 @@ $("closeCart").onclick = () => { $("sheet").style.display = "none"; };
 
 $("send").onclick = async () => {
   const name = $("name").value.trim();
-  const phone = $("phone").value.trim();
-  const digits = phone.replace(/\D/g, "");
+  const phone = normPhone($("phone").value);
+  const digits = phone;
   if (name.length < 2) { $("err").textContent = "Entrez votre nom."; return; }
   if (digits.length < 8) { $("err").textContent = "Entrez un numéro WhatsApp valide."; return; }
   const items = Object.entries(cart).filter(([id, q]) => q > 0 && products.some(p => p.id === id)).map(([productId, quantity]) => ({ productId, quantity }));
   if (!items.length) { $("err").textContent = "Votre commande est vide."; return; }
   const btn = $("send"); btn.disabled = true; btn.textContent = "Envoi…";
   try {
-    await addDoc(collection(db, "catalogs", pid, "orders"), {
-      items, name, phone,
-      payment: document.querySelector("input[name=pay]:checked").value,
-      note: $("note").value.trim(),
-      timestamp: Date.now()
+    const pay = document.querySelector("input[name=pay]:checked").value;
+    const ref = $("payref").value.trim();
+    const note = [$("note").value.trim(), ref ? "Réf. paiement : " + ref : ""].filter(Boolean).join(" | ");
+    const docRef = await addDoc(collection(db, "catalogs", pid, "orders"), {
+      items, name, phone, payment: pay, note, timestamp: Date.now()
     });
-    $("sheet").innerHTML = '<div class="done"><div class="big">✅</div><h2 style="color:inherit;text-transform:none;font-size:22px">Commande envoyée !</h2><p class="sub">Merci ' + name.replace(/[<>&"']/g, "") + '. La boutique va vous contacter sur WhatsApp pour confirmer.</p></div>';
+    LS.set("monstock_client", { name, phone: $("phone").value.trim() });
+    LS.set("monstock_last", { pid, id: docRef.id, t: Date.now() });
     Object.keys(cart).forEach(k => delete cart[k]);
-    $("bar").style.display = "none";
+    $("sheet").style.display = "none";
+    btn.disabled = false; btn.textContent = "✅ Envoyer ma commande";
+    render();
+    track(docRef.id);
+    window.scrollTo(0, 0);
   } catch (e) {
     $("err").textContent = "Échec de l'envoi. Vérifiez votre connexion et réessayez.";
     btn.disabled = false; btn.textContent = "✅ Envoyer ma commande";

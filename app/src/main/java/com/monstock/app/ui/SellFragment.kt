@@ -523,7 +523,28 @@ class SellFragment : Fragment() {
         val dialogBinding = DialogOrdersBinding.inflate(layoutInflater)
         val ordersAdapter = OrderAdapter(
             latestOrders,
+            onReady = { order ->
+                repo.markOrderReady(order)
+                val digits = order.customerPhone.filter { it.isDigit() }
+                val who = if (order.customerName.isNotBlank()) " ${order.customerName}" else ""
+                val msg = "Bonjour$who 👋 Votre commande est prête ✅ Merci de votre confiance !"
+                if (digits.length >= 8) {
+                    try {
+                        startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                Uri.parse("https://wa.me/$digits?text=" + Uri.encode(msg))
+                            )
+                        )
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(requireContext(), "WhatsApp introuvable sur ce téléphone", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    android.widget.Toast.makeText(requireContext(), "✅ Marquée prête (pas de numéro WhatsApp)", android.widget.Toast.LENGTH_LONG).show()
+                }
+            },
             onCancel = { order ->
+                repo.setOnlineStatus(order, "cancelled")
                 repo.cancelOrder(order.id) { msg ->
                     android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_LONG).show()
                 }

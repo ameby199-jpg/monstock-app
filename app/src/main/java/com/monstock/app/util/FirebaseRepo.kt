@@ -167,6 +167,8 @@ class FirebaseRepo(private val shopCode: String) {
                         fromOrder = d.getBoolean("fromOrder") ?: false,
                         employeeName = d.getString("employeeName") ?: "",
                         customerProfile = d.getString("customerProfile") ?: "",
+                        customerName = d.getString("customerName") ?: "",
+                        customerPhone = d.getString("customerPhone") ?: "",
                         ownerId = shopCode
                     )
                 }
@@ -242,7 +244,9 @@ class FirebaseRepo(private val shopCode: String) {
                         customerName = d.getString("customerName") ?: "",
                         customerPhone = d.getString("customerPhone") ?: "",
                         note = d.getString("note") ?: "",
-                        source = d.getString("source") ?: ""
+                        source = d.getString("source") ?: "",
+                        onlineId = d.getString("onlineId") ?: "",
+                        ready = d.getBoolean("ready") ?: false
                     )
                 }
                 onChange(list)
@@ -309,7 +313,9 @@ class FirebaseRepo(private val shopCode: String) {
                 "paymentMethod" to line.paymentMethod,
                 "fromOrder" to true,
                 "employeeName" to employeeName,
-                "customerProfile" to line.customerProfile
+                "customerProfile" to line.customerProfile,
+                "customerName" to order.customerName,
+                "customerPhone" to order.customerPhone
             )
             shopDoc().collection("sales").add(sale)
                 .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
@@ -320,6 +326,7 @@ class FirebaseRepo(private val shopCode: String) {
 
         shopDoc().collection("orders").document(order.id).delete()
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression de la commande") }
+        setOnlineStatus(order, "done")
 
         onSuccess()
     }
@@ -449,7 +456,9 @@ class FirebaseRepo(private val shopCode: String) {
             "customerName" to online.name,
             "customerPhone" to online.phone,
             "note" to online.note,
-            "source" to "web"
+            "source" to "web",
+            "onlineId" to online.id,
+            "ready" to false
         )
         db.runTransaction<Boolean> { tx ->
             if (!tx.get(ref).exists()) {
@@ -460,8 +469,28 @@ class FirebaseRepo(private val shopCode: String) {
                 true
             }
         }
-            .addOnSuccessListener { onDone(it == true) }
+            .addOnSuccessListener {
+                if (it == true) {
+                    catalogDoc(pid).collection("status").document(online.id)
+                        .set(hashMapOf("state" to "received", "updatedAt" to System.currentTimeMillis()))
+                }
+                onDone(it == true)
+            }
             .addOnFailureListener { onDone(false) }
+    }
+
+    /** Met à jour l'état visible par le client sur la page web : received / ready / done / cancelled. */
+    fun setOnlineStatus(order: Order, state: String) {
+        val pid = publicId ?: return
+        if (order.source != "web" || order.onlineId.isBlank()) return
+        catalogDoc(pid).collection("status").document(order.onlineId)
+            .set(hashMapOf("state" to state, "updatedAt" to System.currentTimeMillis()))
+    }
+
+    /** Bouton « Prêt » : le client voit « Votre commande est prête » sur sa page, et la commande est marquée. */
+    fun markOrderReady(order: Order) {
+        setOnlineStatus(order, "ready")
+        shopDoc().collection("orders").document(order.id).update("ready", true)
     }
 
     // ---------- Ingrédients / matières premières ----------

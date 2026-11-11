@@ -36,7 +36,8 @@ private fun paymentIcon(method: String): String = when (method) {
 class OrderAdapter(
     private var items: List<Order>,
     private val onCancel: (Order) -> Unit,
-    private val onTake: (Order) -> Unit
+    private val onTake: (Order) -> Unit,
+    private val onReady: (Order) -> Unit = {}
 ) : RecyclerView.Adapter<OrderAdapter.VH>() {
 
     inner class VH(val binding: ItemOrderBinding) : RecyclerView.ViewHolder(binding.root)
@@ -160,6 +161,11 @@ class OrderAdapter(
 
         val total = order.items.sumOf { it.unitPrice * it.quantity }
         holder.binding.tvOrderTotal.text = "Total : ${CurrencyFormatter.format(total)}"
+
+        // Bouton « Prêt » : seulement pour les commandes en ligne (envoie le message au client).
+        holder.binding.btnReadyOrder.visibility = if (order.source == "web") android.view.View.VISIBLE else android.view.View.GONE
+        holder.binding.btnReadyOrder.text = if (order.ready) "✅ Prêt" else "📲 Prêt"
+        holder.binding.btnReadyOrder.setOnClickListener { onReady(order) }
 
         holder.binding.btnCancelOrder.setOnClickListener { onCancel(order) }
         holder.binding.btnTakeOrder.setOnClickListener { onTake(order) }
