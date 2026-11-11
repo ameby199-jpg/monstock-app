@@ -53,4 +53,12 @@
         android:textSize="16sp"
         android:padding="16dp" />
 
+    <TextView
+        android:id="@+id/optOnlineOrders"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🌐  Commandes en ligne (lien WhatsApp)"
+        android:textSize="16sp"
+        android:padding="16dp" />
+
 </LinearLayout>

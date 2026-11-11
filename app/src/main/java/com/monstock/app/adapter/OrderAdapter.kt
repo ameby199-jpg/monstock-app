@@ -22,6 +22,7 @@ private fun profileAbbreviation(profile: String): String = when (profile) {
     "👩🏿" -> "FM"
     "👦🏿" -> "GR"
     "👧🏿" -> "FIL"
+    "🌐" -> "WEB"
     else -> ""
 }
 
@@ -55,6 +56,35 @@ class OrderAdapter(
         // Chaque produit de la commande : badge profil bien visible, nom, prix, et mode de paiement.
         val density = context.resources.displayMetrics.density
         holder.binding.llOrderItems.removeAllViews()
+
+        // Commande reçue via le lien en ligne : nom, téléphone (touche pour écrire sur WhatsApp), note.
+        if (order.source == "web") {
+            val info = StringBuilder("🌐 Commande en ligne")
+            if (order.customerName.isNotBlank()) info.append("\n👤 ${order.customerName}")
+            if (order.customerPhone.isNotBlank()) info.append("\n📞 ${order.customerPhone}  (toucher = WhatsApp)")
+            if (order.note.isNotBlank()) info.append("\n📝 ${order.note}")
+            val infoView = TextView(context).apply {
+                text = info.toString()
+                textSize = 13f
+                setTextColor(Color.parseColor("#2196F3"))
+                setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                setBackgroundColor(Color.parseColor("#142196F3"))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+                val digits = order.customerPhone.filter { it.isDigit() }
+                if (digits.length >= 8) {
+                    setOnClickListener {
+                        try {
+                            context.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$digits"))
+                            )
+                        } catch (e: Exception) { /* pas d'application pour ouvrir le lien */ }
+                    }
+                }
+            }
+            holder.binding.llOrderItems.addView(infoView)
+        }
         order.items.forEach { line ->
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL

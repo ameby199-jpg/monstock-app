@@ -5,11 +5,14 @@ import android.util.Base64
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.monstock.app.model.Employee
 import com.monstock.app.model.ExpenseNote
 import com.monstock.app.model.Ingredient
 import com.monstock.app.model.IngredientHistoryEntry
 import com.monstock.app.model.IngredientHistoryItem
+import com.monstock.app.model.OnlineOrder
+import com.monstock.app.model.OnlineOrderLine
 import com.monstock.app.model.Order
 import com.monstock.app.model.OrderLine
 import com.monstock.app.model.Product
@@ -234,7 +237,13 @@ class FirebaseRepo(private val shopCode: String) {
                             paymentMethod = m["paymentMethod"] as? String ?: "Espèces"
                         )
                     }
-                    Order(id = d.id, items = items, timestamp = d.getLong("timestamp") ?: 0)
+                    Order(
+                        id = d.id, items = items, timestamp = d.getLong("timestamp") ?: 0,
+                        customerName = d.getString("customerName") ?: "",
+                        customerPhone = d.getString("customerPhone") ?: "",
+                        note = d.getString("note") ?: "",
+                        source = d.getString("source") ?: ""
+                    )
                 }
                 onChange(list)
             }
@@ -313,6 +322,146 @@ class FirebaseRepo(private val shopCode: String) {
             .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de la suppression de la commande") }
 
         onSuccess()
+    }
+
+
+    // ---------- Commandes en ligne (page web envoyée par WhatsApp) ----------
+    // Le lien public ne contient JAMAIS le code boutique : il utilise un identifiant public aléatoire
+    // (publicId), et le catalogue publié ne contient ni prix d'achat ni ventes.
+    // Les données publiques sont sous /catalogs/{publicId}/products et /catalogs/{publicId}/orders.
+
+    private var publicId: String? = null
+    private val syncedHashes = mutableMapOf<String, Int>()
+    private var catalogCleaned = false
+
+    private fun catalogDoc(pid: String) = db.collection("catalogs").document(pid)
+
+    /** Lit l'identifiant public s'il existe déjà (null si la fonction n'a jamais été activée). */
+    fun getPublicId(onResult: (String?) -> Unit) {
+        publicId?.let { onResult(it); return }
+        shopDoc().get()
+            .addOnSuccessListener { d ->
+                val existing = d.getString("publicId")
+                if (!existing.isNullOrBlank()) publicId = existing
+                onResult(existing?.takeIf { it.isNotBlank() })
+            }
+            .addOnFailureListener { onResult(null) }
+    }
+
+    /** Lit l'identifiant public, ou le crée au premier usage (activation de la fonction). */
+    fun getOrCreatePublicId(onResult: (String?) -> Unit) {
+        getPublicId { existing ->
+            if (existing != null) { onResult(existing); return@getPublicId }
+            val fresh = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+            shopDoc().set(hashMapOf("publicId" to fresh), SetOptions.merge())
+                .addOnSuccessListener { publicId = fresh; onResult(fresh) }
+                .addOnFailureListener { onResult(null) }
+        }
+    }
+
+    /** Publie le catalogue (nom, prix de vente, stock, photo, dérivé) ; n'écrit que ce qui a changé. */
+    fun syncCatalog(pid: String, products: List<Product>) {
+        val col = catalogDoc(pid).collection("products")
+        products.forEach { p ->
+            val hash = listOf(p.name, p.price, p.quantity, p.isDerived, p.photoBase64.length, p.photoBase64.hashCode()).hashCode()
+            if (syncedHashes[p.id] != hash) {
+                syncedHashes[p.id] = hash
+                col.document(p.id).set(
+                    hashMapOf(
+                        "name" to p.name,
+                        "price" to p.price,
+                        "quantity" to p.quantity,
+                        "isDerived" to p.isDerived,
+                        "photoBase64" to p.photoBase64
+                    )
+                ).addOnFailureListener { syncedHashes.remove(p.id) }
+            }
+        }
+        val currentIds = products.map { it.id }.toSet()
+        (syncedHashes.keys - currentIds).toList().forEach { id ->
+            syncedHashes.remove(id)
+            col.document(id).delete()
+        }
+        // Premier passage après le démarrage : retire du catalogue les produits supprimés entre-temps.
+        if (!catalogCleaned && products.isNotEmpty()) {
+            catalogCleaned = true
+            col.get().addOnSuccessListener { snap ->
+                snap.documents.filter { it.id !in currentIds }.forEach { it.reference.delete() }
+            }
+        }
+    }
+
+    fun listenOnlineOrders(pid: String, onChange: (List<OnlineOrder>) -> Unit): ListenerRegistration {
+        return catalogDoc(pid).collection("orders")
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                onChange(snap.documents.map { d ->
+                    @Suppress("UNCHECKED_CAST")
+                    val raw = d.get("items") as? List<Map<String, Any>> ?: emptyList()
+                    val lines = raw.mapNotNull { m ->
+                        val id = m["productId"] as? String ?: return@mapNotNull null
+                        val q = (m["quantity"] as? Number)?.toLong() ?: 0L
+                        if (q > 0) OnlineOrderLine(id, q.coerceAtMost(999)) else null
+                    }
+                    OnlineOrder(
+                        id = d.id,
+                        lines = lines,
+                        name = (d.getString("name") ?: "").take(60),
+                        phone = (d.getString("phone") ?: "").take(30),
+                        payment = d.getString("payment") ?: "Espèces",
+                        note = (d.getString("note") ?: "").take(300),
+                        timestamp = d.getLong("timestamp") ?: System.currentTimeMillis()
+                    )
+                })
+            }
+    }
+
+    /**
+     * Transforme une commande web en vraie commande en attente. Les noms et PRIX viennent des produits
+     * de l'app (jamais du client). Une transaction garantit qu'un seul appareil l'importe, même si
+     * plusieurs téléphones sont ouverts en même temps.
+     */
+    fun importOnlineOrder(pid: String, online: OnlineOrder, products: List<Product>, onDone: (Boolean) -> Unit) {
+        val ref = catalogDoc(pid).collection("orders").document(online.id)
+        val byId = products.associateBy { it.id }
+        val payment = if (online.payment == "Orange Money" || online.payment == "Wave") online.payment else "Espèces"
+        val items = online.lines.mapNotNull { l ->
+            val p = byId[l.productId] ?: return@mapNotNull null
+            hashMapOf(
+                "productId" to p.id,
+                "productName" to p.name,
+                "quantity" to l.quantity,
+                "unitPrice" to p.price,
+                "costPrice" to p.costPrice,
+                "customerProfile" to "🌐",
+                "paymentMethod" to payment
+            )
+        }
+        if (items.isEmpty()) {
+            ref.delete()
+            onDone(false)
+            return
+        }
+        val newRef = shopDoc().collection("orders").document()
+        val data = hashMapOf(
+            "items" to items,
+            "timestamp" to System.currentTimeMillis(),
+            "customerName" to online.name,
+            "customerPhone" to online.phone,
+            "note" to online.note,
+            "source" to "web"
+        )
+        db.runTransaction<Boolean> { tx ->
+            if (!tx.get(ref).exists()) {
+                false
+            } else {
+                tx.delete(ref)
+                tx.set(newRef, data)
+                true
+            }
+        }
+            .addOnSuccessListener { onDone(it == true) }
+            .addOnFailureListener { onDone(false) }
     }
 
     // ---------- Ingrédients / matières premières ----------

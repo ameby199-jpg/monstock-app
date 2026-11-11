@@ -29,6 +29,7 @@ import com.monstock.app.databinding.DialogSellBinding
 import com.monstock.app.databinding.DialogSettingsBinding
 import com.monstock.app.databinding.DialogThemePickerBinding
 import com.monstock.app.databinding.FragmentSellBinding
+import com.monstock.app.model.OnlineOrder
 import com.monstock.app.model.Order
 import com.monstock.app.model.OrderLine
 import com.monstock.app.model.Product
@@ -55,6 +56,12 @@ class SellFragment : Fragment() {
     private var latestProducts: List<Product> = emptyList()
     private var salesCountByProductId: Map<String, Long> = emptyMap()
     private var latestOrders: List<Order> = emptyList()
+
+    // Commandes en ligne (lien WhatsApp) : actif seulement après activation dans Réglages.
+    private var publicId: String? = null
+    private var onlineListener: ListenerRegistration? = null
+    private var latestOnline: List<OnlineOrder> = emptyList()
+    private val importingOnline = mutableSetOf<String>()
 
     // Index alphabétique : (lettre, position du premier produit de cette lettre dans la grille affichée).
     private var alphaPositions: List<Pair<String, Int>> = emptyList()
@@ -109,7 +116,10 @@ class SellFragment : Fragment() {
         productsListener = repo.listenProducts { products ->
             latestProducts = products
             refreshList()
+            publicId?.let { repo.syncCatalog(it, products) }
+            processOnlineOrders()
         }
+        repo.getPublicId { pid -> if (pid != null && _binding != null) startOnlineOrders(pid) }
         salesListener = repo.listenSales { sales ->
             salesCountByProductId = sales.groupBy { it.productId }.mapValues { (_, list) -> list.sumOf { it.quantity } }
             refreshList()
@@ -560,6 +570,76 @@ class SellFragment : Fragment() {
         dialog.show()
     }
 
+
+    // ---------- Commandes en ligne ----------
+
+    private fun startOnlineOrders(pid: String) {
+        if (publicId == pid && onlineListener != null) return
+        publicId = pid
+        if (latestProducts.isNotEmpty()) repo.syncCatalog(pid, latestProducts)
+        onlineListener?.remove()
+        onlineListener = repo.listenOnlineOrders(pid) { list ->
+            latestOnline = list
+            processOnlineOrders()
+        }
+    }
+
+    /** Chaque commande reçue du web devient une vraie commande en attente (⏰) avec bip + message. */
+    private fun processOnlineOrders() {
+        val pid = publicId ?: return
+        if (latestProducts.isEmpty()) return
+        latestOnline.forEach { online ->
+            if (importingOnline.add(online.id)) {
+                repo.importOnlineOrder(pid, online, latestProducts) { ok ->
+                    importingOnline.remove(online.id)
+                    val ctx = context
+                    if (ok && ctx != null && _binding != null) {
+                        try {
+                            android.media.RingtoneManager.getRingtone(
+                                ctx, android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                            ).play()
+                        } catch (e: Exception) { /* pas de son, tant pis */ }
+                        val who = if (online.name.isNotBlank()) " de ${online.name}" else ""
+                        android.widget.Toast.makeText(ctx, "🌐 Nouvelle commande en ligne$who !", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showOnlineOrdersDialog() {
+        repo.getOrCreatePublicId { pid ->
+            val ctx = context ?: return@getOrCreatePublicId
+            if (pid == null || _binding == null) {
+                android.widget.Toast.makeText(ctx, "Impossible d'activer pour l'instant (vérifie la connexion internet).", android.widget.Toast.LENGTH_LONG).show()
+                return@getOrCreatePublicId
+            }
+            startOnlineOrders(pid)
+            val link = "$ONLINE_ORDER_BASE_URL?s=$pid"
+            AlertDialog.Builder(ctx)
+                .setTitle("🌐 Commandes en ligne")
+                .setMessage(
+                    "Envoie ce lien à tes clients sur WhatsApp. Ils choisissent leurs produits et leur commande arrive ici, dans ⏰ Commandes en attente.\n\n" +
+                        "$link\n\n" +
+                        "⚠️ Pour recevoir les commandes, Monstock doit être ouvert sur un téléphone."
+                )
+                .setPositiveButton("📲 WhatsApp") { _, _ ->
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, "🛒 Commandez en ligne ici : $link")
+                    }
+                    startActivity(android.content.Intent.createChooser(send, "Envoyer le lien"))
+                }
+                .setNeutralButton("📋 Copier") { _, _ ->
+                    val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("lien", link))
+                    android.widget.Toast.makeText(ctx, "Lien copié", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Fermer", null)
+                .show()
+        }
+    }
+
     private fun showSettingsDialog() {
         val dialogBinding = DialogSettingsBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(requireContext())
@@ -568,6 +648,10 @@ class SellFragment : Fragment() {
             .setNegativeButton("Fermer", null)
             .create()
 
+        dialogBinding.optOnlineOrders.setOnClickListener {
+            dialog.dismiss()
+            showOnlineOrdersDialog()
+        }
         dialogBinding.optBackground.setOnClickListener {
             dialog.dismiss()
             pickBackground.launch("image/*")
@@ -665,7 +749,12 @@ class SellFragment : Fragment() {
         productsListener?.remove()
         salesListener?.remove()
         ordersListener?.remove()
+        onlineListener?.remove()
+        onlineListener = null
         ordersDialogAdapter = null
         _binding = null
     }
 }
+
+/** Adresse de la page de commande (GitHub Pages du dépôt monstock-app, dossier docs). */
+private const val ONLINE_ORDER_BASE_URL = "https://ameby199-jpg.github.io/monstock-app/"

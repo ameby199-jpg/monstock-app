@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commander</title>
+<style>
+:root{--bg:#f4f4f6;--card:#fff;--text:#1c1c1e;--muted:#6b6b70;--accent:#ef6c00;--ok:#2e9e4f;--line:#e2e2e6}
+@media (prefers-color-scheme:dark){:root{--bg:#161618;--card:#242427;--text:#f2f2f4;--muted:#a0a0a8;--line:#38383c}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+header{padding:calc(16px + env(safe-area-inset-top,0px)) 16px 8px}
+h1{margin:0;font-size:22px}
+.sub{color:var(--muted);font-size:14px;margin-top:2px}
+h2{font-size:15px;margin:18px 16px 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px}
+.card{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--line);display:flex;flex-direction:column}
+.card img,.noimg{width:100%;aspect-ratio:4/3;object-fit:cover;background:#8884;display:flex;align-items:center;justify-content:center;font-size:36px}
+.info{padding:8px 10px 4px;flex:1}
+.name{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.price{color:var(--accent);font-weight:700;font-size:14px;margin-top:2px}
+.step{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px}
+.step button{width:40px;height:40px;border-radius:50%;border:0;font-size:22px;font-weight:700;background:var(--accent);color:#fff}
+.step button:disabled{opacity:.3}
+.step span{min-width:28px;text-align:center;font-weight:700;font-size:17px}
+.msg{padding:30px 20px;text-align:center;color:var(--muted)}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid var(--line);display:none}
+#bar button,.btn{width:100%;height:52px;border:0;border-radius:14px;background:var(--ok);color:#fff;font-size:17px;font-weight:700}
+#sheet{position:fixed;inset:0;background:var(--bg);overflow:auto;display:none;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 30px}
+#sheet h3{margin:6px 0 10px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.total{font-weight:800;font-size:19px;color:var(--accent);margin:12px 0}
+label{display:block;font-weight:600;margin:14px 0 6px;font-size:14px}
+input[type=text],input[type=tel],textarea{width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:16px}
+.pay{display:flex;gap:8px;flex-wrap:wrap}
+.pay label{margin:0;flex:1;min-width:100px;text-align:center;border:2px solid var(--line);border-radius:12px;padding:12px 6px;background:var(--card)}
+.pay input{display:none}
+.pay input:checked+span{font-weight:800}
+.pay label:has(input:checked){border-color:var(--accent)}
+.back{background:none;border:0;color:var(--accent);font-size:16px;font-weight:700;padding:6px 0}
+#err{color:#d32f2f;font-weight:600;margin-top:10px;min-height:20px}
+.done{text-align:center;padding-top:60px}.done .big{font-size:64px}
+</style>
+</head>
+<body>
+<header><h1 id="title">🛒 Commandez ici</h1><div class="sub">Choisissez vos produits puis envoyez votre commande</div></header>
+<div id="content"><div class="msg">Chargement…</div></div>
+
+<div id="bar"><button id="openCart"></button></div>
+
+<div id="sheet">
+  <button class="back" id="closeCart">← Modifier ma commande</button>
+  <h3>Ma commande</h3>
+  <div id="recap"></div>
+  <div class="total" id="total"></div>
+  <label for="name">Votre nom</label>
+  <input id="name" type="text" autocomplete="name" maxlength="60" placeholder="Ex : Mamadou">
+  <label for="phone">Votre numéro WhatsApp</label>
+  <input id="phone" type="tel" autocomplete="tel" maxlength="20" placeholder="Ex : 224 6xx xx xx xx">
+  <label>Paiement prévu</label>
+  <div class="pay">
+    <label><input type="radio" name="pay" value="Espèces" checked><span>💵 Espèces</span></label>
+    <label><input type="radio" name="pay" value="Orange Money"><span>🟠 Orange Money</span></label>
+    <label><input type="radio" name="pay" value="Wave"><span>🔵 Wave</span></label>
+  </div>
+  <label for="note">Précision (facultatif)</label>
+  <textarea id="note" rows="2" maxlength="300" placeholder="Ex : sans piment, livraison à Kaloum…"></textarea>
+  <div id="err"></div>
+  <button class="btn" id="send" style="margin-top:12px">✅ Envoyer ma commande</button>
+</div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const $ = id => document.getElementById(id);
+const cfg = window.MONSTOCK_CONFIG || {};
+const pid = new URLSearchParams(location.search).get("s") || "";
+const fmt = n => new Intl.NumberFormat("fr-FR").format(Math.round(n)).replace(/\u202f|\u00a0/g, " ") + " FCFA";
+if (cfg.shopTitle) $("title").textContent = "🛒 " + cfg.shopTitle;
+
+function show(msg){ $("content").innerHTML = ""; const d = document.createElement("div"); d.className = "msg"; d.textContent = msg; $("content").appendChild(d); }
+
+if (!/^[A-Za-z0-9]{8,40}$/.test(pid)) { show("Lien invalide. Demandez le lien de commande à la boutique."); throw new Error("pid"); }
+if (!cfg.apiKey || cfg.apiKey === "A_REMPLIR") { show("Page pas encore configurée (config.js)."); throw new Error("config"); }
+
+const db = getFirestore(initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId, appId: cfg.appId }));
+let products = [];
+const cart = {};           // productId -> quantité
+
+onSnapshot(collection(db, "catalogs", pid, "products"), snap => {
+  products = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => (p.quantity || 0) > 0 && p.name)
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  Object.keys(cart).forEach(id => { const p = products.find(x => x.id === id); if (!p) delete cart[id]; else cart[id] = Math.min(cart[id], p.quantity); });
+  render();
+}, () => show("Impossible de charger les produits. Réessayez plus tard."));
+
+function card(p){
+  const c = document.createElement("div"); c.className = "card";
+  const photo = typeof p.photoBase64 === "string" && /^[A-Za-z0-9+\/=\s]+$/.test(p.photoBase64) && p.photoBase64.length > 100;
+  if (photo) { const i = document.createElement("img"); i.alt = ""; i.loading = "lazy"; i.src = "data:image/jpeg;base64," + p.photoBase64.replace(/\s/g, ""); c.appendChild(i); }
+  else { const n = document.createElement("div"); n.className = "noimg"; n.textContent = "🍽️"; c.appendChild(n); }
+  const info = document.createElement("div"); info.className = "info";
+  const nm = document.createElement("div"); nm.className = "name"; nm.textContent = p.name;
+  const pr = document.createElement("div"); pr.className = "price"; pr.textContent = fmt(p.price || 0);
+  info.append(nm, pr);
+  const st = document.createElement("div"); st.className = "step";
+  const minus = document.createElement("button"); minus.textContent = "−";
+  const qty = document.createElement("span"); qty.textContent = cart[p.id] || 0;
+  const plus = document.createElement("button"); plus.textContent = "+";
+  minus.disabled = !(cart[p.id] > 0);
+  plus.disabled = (cart[p.id] || 0) >= Math.min(p.quantity, 99);
+  minus.onclick = () => { cart[p.id] = (cart[p.id] || 0) - 1; if (cart[p.id] <= 0) delete cart[p.id]; render(); };
+  plus.onclick = () => { cart[p.id] = (cart[p.id] || 0) + 1; render(); };
+  st.append(minus, qty, plus);
+  c.append(info, st);
+  return c;
+}
+
+function section(title, list){
+  if (!list.length) return;
+  const h = document.createElement("h2"); h.textContent = title;
+  const g = document.createElement("div"); g.className = "grid";
+  list.forEach(p => g.appendChild(card(p)));
+  $("content").append(h, g);
+}
+
+function totals(){
+  let n = 0, t = 0;
+  for (const [id, q] of Object.entries(cart)) { const p = products.find(x => x.id === id); if (p) { n += q; t += q * (p.price || 0); } }
+  return { n, t };
+}
+
+function render(){
+  const y = window.scrollY;
+  $("content").innerHTML = "";
+  if (!products.length) { show("Aucun produit disponible pour le moment."); }
+  else {
+    section("Nos produits", products.filter(p => !p.isDerived));
+    section("🧩 Suppléments & boissons", products.filter(p => p.isDerived));
+  }
+  const { n, t } = totals();
+  $("bar").style.display = n ? "block" : "none";
+  $("openCart").textContent = "🛒 Voir ma commande (" + n + ") · " + fmt(t);
+  window.scrollTo(0, y);
+}
+
+$("openCart").onclick = () => {
+  const r = $("recap"); r.innerHTML = "";
+  for (const [id, q] of Object.entries(cart)) {
+    const p = products.find(x => x.id === id); if (!p) continue;
+    const row = document.createElement("div"); row.className = "row";
+    const a = document.createElement("span"); a.textContent = q + " × " + p.name;
+    const b = document.createElement("b"); b.textContent = fmt(q * (p.price || 0));
+    row.append(a, b); r.appendChild(row);
+  }
+  $("total").textContent = "Total : " + fmt(totals().t);
+  $("err").textContent = "";
+  $("sheet").style.display = "block";
+  window.scrollTo(0, 0);
+};
+$("closeCart").onclick = () => { $("sheet").style.display = "none"; };
+
+$("send").onclick = async () => {
+  const name = $("name").value.trim();
+  const phone = $("phone").value.trim();
+  const digits = phone.replace(/\D/g, "");
+  if (name.length < 2) { $("err").textContent = "Entrez votre nom."; return; }
+  if (digits.length < 8) { $("err").textContent = "Entrez un numéro WhatsApp valide."; return; }
+  const items = Object.entries(cart).filter(([id, q]) => q > 0 && products.some(p => p.id === id)).map(([productId, quantity]) => ({ productId, quantity }));
+  if (!items.length) { $("err").textContent = "Votre commande est vide."; return; }
+  const btn = $("send"); btn.disabled = true; btn.textContent = "Envoi…";
+  try {
+    await addDoc(collection(db, "catalogs", pid, "orders"), {
+      items, name, phone,
+      payment: document.querySelector("input[name=pay]:checked").value,
+      note: $("note").value.trim(),
+      timestamp: Date.now()
+    });
+    $("sheet").innerHTML = '<div class="done"><div class="big">✅</div><h2 style="color:inherit;text-transform:none;font-size:22px">Commande envoyée !</h2><p class="sub">Merci ' + name.replace(/[<>&"']/g, "") + '. La boutique va vous contacter sur WhatsApp pour confirmer.</p></div>';
+    Object.keys(cart).forEach(k => delete cart[k]);
+    $("bar").style.display = "none";
+  } catch (e) {
+    $("err").textContent = "Échec de l'envoi. Vérifiez votre connexion et réessayez.";
+    btn.disabled = false; btn.textContent = "✅ Envoyer ma commande";
+  }
+};
+</script>
+</body>
+</html>
