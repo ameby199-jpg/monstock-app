@@ -1,8 +1,6 @@
-// À REMPLIR UNE SEULE FOIS avec les valeurs de ton projet Firebase
-// (elles se trouvent dans app/google-services.json : api_key.current_key, project_id, mobilesdk_app_id).
 window.MONSTOCK_CONFIG = {
-  apiKey: "A_REMPLIR",
-  projectId: "A_REMPLIR",
-  appId: "A_REMPLIR",
+  apiKey: "AIzaSyB-EWPvbTLngy-xVWDAaWYv5mXSIGoxzgA",
+  projectId: "monstock-e62d3",
+  appId: "1:611269480514:android:a57d88f276fdec2ef81ddb",
   shopTitle: "Commandez ici"
 };
