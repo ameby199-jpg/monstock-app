@@ -61,4 +61,12 @@
         android:textSize="16sp"
         android:padding="16dp" />
 
+    <TextView
+        android:id="@+id/optKeepAlive"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔔  Notifications : garder actives"
+        android:textSize="16sp"
+        android:padding="16dp" />
+
 </LinearLayout>

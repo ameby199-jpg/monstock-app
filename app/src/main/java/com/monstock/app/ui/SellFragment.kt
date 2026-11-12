@@ -29,6 +29,7 @@ import com.monstock.app.databinding.DialogSellBinding
 import com.monstock.app.databinding.DialogSettingsBinding
 import com.monstock.app.databinding.DialogThemePickerBinding
 import com.monstock.app.databinding.FragmentSellBinding
+import com.monstock.app.OnlineOrderService
 import com.monstock.app.model.OnlineOrder
 import com.monstock.app.model.Order
 import com.monstock.app.model.OrderLine
@@ -77,6 +78,8 @@ class SellFragment : Fragment() {
 
     // Tant que la fenêtre des commandes en attente est ouverte, on la tient à jour en direct.
     private var ordersDialogAdapter: OrderAdapter? = null
+
+    private val askNotifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     private val pickBackground = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -603,6 +606,43 @@ class SellFragment : Fragment() {
             latestOnline = list
             processOnlineOrders()
         }
+        // Notifications même app fermée : service d'arrière-plan (sauf si l'utilisateur l'a arrêté).
+        requestNotifPermissionIfNeeded()
+        context?.let { OnlineOrderService.start(it.applicationContext, pid, false) }
+    }
+
+    private fun requestNotifPermissionIfNeeded() {
+        val ctx = context ?: return
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            askNotifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun showKeepAliveDialog() {
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx)
+            .setTitle("🔔 Notifications app fermée")
+            .setMessage(
+                "Pour être prévenu à chaque commande même quand Monstock est fermé, ouvre les réglages de l'app et vérifie :\n\n" +
+                    "1. Notifications : autorisées.\n" +
+                    "2. Batterie : « Aucune restriction ».\n" +
+                    "3. Démarrage automatique : activé (Xiaomi).\n\n" +
+                    "Astuce Xiaomi : dans la liste des applications récentes, verrouille Monstock avec le cadenas.\n\n" +
+                    "Une petite notification fixe reste affichée : c'est normal, elle garde la surveillance active."
+            )
+            .setPositiveButton("Ouvrir les réglages") { _, _ ->
+                try {
+                    startActivity(
+                        android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.parse("package:" + ctx.packageName))
+                    )
+                } catch (e: Exception) { /* réglages introuvables */ }
+            }
+            .setNegativeButton("Fermer", null)
+            .show()
     }
 
     /** Chaque commande reçue du web devient une vraie commande en attente (⏰) avec bip + message. */
@@ -636,13 +676,15 @@ class SellFragment : Fragment() {
                 return@getOrCreatePublicId
             }
             startOnlineOrders(pid)
+            requestNotifPermissionIfNeeded()
+            OnlineOrderService.start(ctx.applicationContext, pid, true)
             val link = "$ONLINE_ORDER_BASE_URL?s=$pid"
             AlertDialog.Builder(ctx)
                 .setTitle("🌐 Commandes en ligne")
                 .setMessage(
                     "Envoie ce lien à tes clients sur WhatsApp. Ils choisissent leurs produits et leur commande arrive ici, dans ⏰ Commandes en attente.\n\n" +
                         "$link\n\n" +
-                        "⚠️ Pour recevoir les commandes, Monstock doit être ouvert sur un téléphone."
+                        "🔔 Tu seras prévenu par notification à chaque commande, même quand l'app est fermée. Voir « Notifications : garder actives » dans les Réglages."
                 )
                 .setPositiveButton("📲 WhatsApp") { _, _ ->
                     val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -669,6 +711,10 @@ class SellFragment : Fragment() {
             .setNegativeButton("Fermer", null)
             .create()
 
+        dialogBinding.optKeepAlive.setOnClickListener {
+            dialog.dismiss()
+            showKeepAliveDialog()
+        }
         dialogBinding.optOnlineOrders.setOnClickListener {
             dialog.dismiss()
             showOnlineOrdersDialog()
@@ -763,6 +809,16 @@ class SellFragment : Fragment() {
             }
         }
         dialog.show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        OnlineOrderService.appVisible = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        OnlineOrderService.appVisible = false
     }
 
     override fun onDestroyView() {
