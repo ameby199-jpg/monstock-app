@@ -20,5 +20,6 @@ data class Sale(
     // Pour une vente issue d'une commande en ligne : nom et téléphone du client.
     var customerName: String = "",
     var customerPhone: String = "",
+    var note: String = "",
     var ownerId: String = ""
 )

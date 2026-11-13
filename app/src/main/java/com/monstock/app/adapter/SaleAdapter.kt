@@ -65,6 +65,9 @@ class SaleAdapter(private var items: List<SaleListItem>) : RecyclerView.Adapter<
                         if (t.contains("🌐")) t else t + customerSuffix(sale)
                     }
                 }
+                if (sale.note.isNotBlank()) {
+                    r.binding.tvSaleDetails.text = r.binding.tvSaleDetails.text.toString() + "\n📝 " + sale.note
+                }
                 r.binding.tvSalePayment.text = sale.paymentMethod
 
                 val colorRes = when (sale.paymentMethod) {

@@ -39,10 +39,16 @@ input[type=text],input[type=tel],textarea{width:100%;padding:13px;border-radius:
 .pay label:has(input:checked){border-color:var(--accent)}
 .back{background:none;border:0;color:var(--accent);font-size:16px;font-weight:700;padding:6px 0}
 #err{color:#d32f2f;font-weight:600;margin-top:10px;min-height:20px}
-#track{display:none;margin:12px;padding:14px;border-radius:14px;background:var(--card);border:2px solid var(--accent)}
-#track .st{font-size:18px;font-weight:800;margin-bottom:4px}
-#track.ready{border-color:var(--ok);background:#2e9e4f22}
-#track button{margin-top:10px;padding:10px 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700}
+#track{display:none;margin:12px}
+#track .tt{font-size:16px;font-weight:800;margin:0 0 8px}
+#track .ord{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+#track .ord.ready{border-color:var(--ok);background:#2e9e4f22}
+#track .ord.active{border-color:var(--accent)}
+#track .st{font-size:17px;font-weight:800}
+#track .meta{color:var(--muted);font-size:13px;margin:2px 0 6px}
+#track .due{font-weight:800;color:var(--accent);margin-top:6px}
+#track button{margin-top:8px;padding:8px 12px;border:0;border-radius:10px;background:var(--line);color:var(--text);font-weight:700}
+.comp{margin:4px 0 0}.comp summary{font-size:12px;color:var(--muted);cursor:pointer}.comp div{font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
 #paybox{display:none;margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--accent);background:var(--card);font-size:15px}
 #paybox b{font-size:17px}
 #paybox button{margin:8px 8px 0 0;padding:10px 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:15px}
@@ -144,33 +150,63 @@ function updatePayBox(){
 }
 document.querySelectorAll("input[name=pay]").forEach(r => r.addEventListener("change", updatePayBox));
 
-// Suivi de la commande en direct : reçue -> prête.
-let unsubTrack = null;
-function track(id){
-  const el = $("track"); el.style.display = "block";
-  if (unsubTrack) unsubTrack();
-  const draw = state => {
-    el.className = state === "ready" ? "ready" : "";
-    el.innerHTML = "";
-    const st = document.createElement("div"); st.className = "st";
-    const sub = document.createElement("div"); sub.className = "sub";
-    if (state === "ready") { st.textContent = "✅ Votre commande est PRÊTE !"; sub.textContent = "Vous pouvez venir la récupérer."; try { navigator.vibrate && navigator.vibrate([200,100,200,100,400]); } catch(e){} document.title = "✅ Commande prête"; }
-    else if (state === "received") { st.textContent = "👨‍🍳 Commande reçue, en préparation…"; sub.textContent = "Gardez cette page ouverte : elle vous prévient quand c'est prêt."; }
-    else if (state === "cancelled") { st.textContent = "❌ Commande annulée"; sub.textContent = "Contactez la boutique pour plus d'informations."; }
-    else if (state === "done") { st.textContent = "🎉 Commande remise. Merci !"; sub.textContent = ""; }
-    else { st.textContent = "⏳ Commande envoyée…"; sub.textContent = "En attente de la boutique."; }
-    el.append(st, sub);
-    if (state === "done" || state === "cancelled") {
-      const bt = document.createElement("button"); bt.textContent = "Nouvelle commande";
-      bt.onclick = () => { LS.del("monstock_last"); el.style.display = "none"; if (unsubTrack) unsubTrack(); };
-      el.appendChild(bt);
+// « Mes commandes » : commandes passées depuis CE téléphone, avec l'état en direct et la somme à payer.
+// Le client ne voit jamais les commandes des autres : chaque suivi lit uniquement son propre numéro de commande.
+const HIST_KEY = "monstock_orders";
+let history = (LS.get(HIST_KEY) || []).filter(o => o && o.pid === pid && Date.now() - o.t < 3 * 24 * 3600 * 1000).slice(0, 10);
+const unsubs = {};
+const saveHist = () => LS.set(HIST_KEY, history);
+const finished = st => st === "done" || st === "cancelled";
+
+function renderOrders(){
+  const box = $("track"); box.innerHTML = "";
+  if (!history.length) { box.style.display = "none"; return; }
+  box.style.display = "block";
+  const h = document.createElement("div"); h.className = "tt"; h.textContent = "🧾 Mes commandes";
+  box.appendChild(h);
+  history.forEach(o => {
+    const st = o.state || "sent";
+    const card = document.createElement("div");
+    card.className = "ord " + (st === "ready" ? "ready" : (finished(st) ? "" : "active"));
+    const s = document.createElement("div"); s.className = "st";
+    s.textContent = st === "ready" ? "✅ Prête : " + ((o.lines || []).join(", ") || "votre commande") + " — venez la récupérer !"
+      : st === "received" ? "👨‍🍳 Reçue, en préparation…"
+      : st === "cancelled" ? "❌ Annulée"
+      : st === "done" ? "🎉 Remise. Merci !"
+      : "⏳ Envoyée, en attente de la boutique…";
+    const m = document.createElement("div"); m.className = "meta";
+    m.textContent = new Date(o.t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + " · " + (o.lines || []).join(", ");
+    card.append(s, m);
+    if (!finished(st)) {
+      const due = document.createElement("div"); due.className = "due";
+      due.textContent = (st === "ready" ? "💰 Total à payer : " : "💰 À payer : ") + fmt(o.total || 0) + (o.payment ? " (" + o.payment + ")" : "");
+      card.appendChild(due);
+    } else {
+      const bt = document.createElement("button"); bt.textContent = "Effacer";
+      bt.onclick = () => { history = history.filter(x => x.id !== o.id); saveHist(); renderOrders(); };
+      card.appendChild(bt);
     }
-  };
-  draw("sent");
-  unsubTrack = onSnapshot(doc(db, "catalogs", pid, "status", id), snap => { if (snap.exists()) draw(snap.data().state); }, () => {});
+    box.appendChild(card);
+  });
 }
-const last = LS.get("monstock_last");
-if (last && last.pid === pid && last.id && Date.now() - (last.t || 0) < 12 * 3600 * 1000) track(last.id);
+
+function watch(o){
+  if (unsubs[o.id] || finished(o.state)) return;
+  unsubs[o.id] = onSnapshot(doc(db, "catalogs", pid, "status", o.id), snap => {
+    if (!snap.exists()) return;
+    const prev = o.state;
+    const dta = snap.data();
+    o.state = dta.state;
+    if (typeof dta.total === "number") o.total = dta.total;
+    if (Array.isArray(dta.lines) && dta.lines.length) o.lines = dta.lines;
+    saveHist();
+    if (o.state === "ready" && prev !== "ready") { try { navigator.vibrate && navigator.vibrate([200, 100, 200, 100, 400]); } catch (e) {} document.title = "✅ Commande prête"; }
+    if (finished(o.state) && unsubs[o.id]) { unsubs[o.id](); }
+    renderOrders();
+  }, () => {});
+}
+history.forEach(watch);
+renderOrders();
 
 onSnapshot(collection(db, "catalogs", pid, "products"), snap => {
   products = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -189,6 +225,12 @@ function card(p){
   const nm = document.createElement("div"); nm.className = "name"; nm.textContent = p.name;
   const pr = document.createElement("div"); pr.className = "price"; pr.textContent = fmt(p.price || 0);
   info.append(nm, pr);
+  if (typeof p.composants === "string" && p.composants.trim()) {
+    const d = document.createElement("details"); d.className = "comp";
+    const sm = document.createElement("summary"); sm.textContent = "🧩 Composants";
+    const tx = document.createElement("div"); tx.textContent = p.composants.trim();
+    d.append(sm, tx); info.appendChild(d);
+  }
   const st = document.createElement("div"); st.className = "step";
   const minus = document.createElement("button"); minus.textContent = "−";
   const qty = document.createElement("span"); qty.textContent = cart[p.id] || 0;
@@ -264,12 +306,14 @@ $("send").onclick = async () => {
       items, name, phone, payment: pay, note, timestamp: Date.now()
     });
     LS.set("monstock_client", { name, phone: $("phone").value.trim() });
-    LS.set("monstock_last", { pid, id: docRef.id, t: Date.now() });
+    const lines = Object.entries(cart).map(([id, q]) => { const p = products.find(x => x.id === id); return p ? q + " × " + p.name : ""; }).filter(Boolean);
+    history.unshift({ id: docRef.id, pid, t: Date.now(), total: totals().t, payment: pay, lines, state: "sent" });
+    history = history.slice(0, 10); saveHist(); watch(history[0]);
     Object.keys(cart).forEach(k => delete cart[k]);
     $("sheet").style.display = "none";
     btn.disabled = false; btn.textContent = "✅ Envoyer ma commande";
     render();
-    track(docRef.id);
+    renderOrders();
     window.scrollTo(0, 0);
   } catch (e) {
     $("err").textContent = "Échec de l'envoi. Vérifiez votre connexion et réessayez.";

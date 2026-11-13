@@ -41,6 +41,7 @@ import com.monstock.app.util.CurrencyFormatter
 import com.monstock.app.util.EmployeeSession
 import com.monstock.app.util.FirebaseRepo
 import com.monstock.app.util.OrderButtonPrefs
+import com.monstock.app.util.SecureLogin
 import com.monstock.app.util.ShopPrefs
 import com.monstock.app.util.ThemePrefs
 
@@ -530,7 +531,9 @@ class SellFragment : Fragment() {
                 repo.markOrderReady(order)
                 val digits = order.customerPhone.filter { it.isDigit() }
                 val who = if (order.customerName.isNotBlank()) " ${order.customerName}" else ""
-                val msg = "Bonjour$who 👋 Votre commande est prête ✅ Merci de votre confiance !"
+                val dishes = order.items.joinToString(", ") { "${it.quantity} × ${it.productName}" }
+                val totalDue = CurrencyFormatter.format(order.items.sumOf { it.unitPrice * it.quantity })
+                val msg = "Bonjour$who 👋 Votre commande est prête ✅\n$dishes\n💰 Total à payer : $totalDue\nMerci de votre confiance !"
                 if (digits.length >= 8) {
                     try {
                         startActivity(
@@ -619,6 +622,26 @@ class SellFragment : Fragment() {
         ) {
             askNotifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private fun showSecureLoginDialog() {
+        val act = activity ?: return
+        val signedIn = SecureLogin.isSignedIn()
+        AlertDialog.Builder(act)
+            .setTitle("🔐 Connexion sécurisée")
+            .setMessage(
+                (if (signedIn) "✅ Ce téléphone est connecté au compte boutique." else "⚠️ Ce téléphone n'est pas connecté.") +
+                    "\n\nLe mot de passe boutique protège tes ventes, ton stock et tes commandes. À faire une fois sur chaque téléphone."
+            )
+            .setPositiveButton(if (signedIn) "Se reconnecter" else "Se connecter") { _, _ ->
+                SecureLogin.showDialog(act, onSuccess = { act.recreate() }, onLater = {})
+            }
+            .setNeutralButton("Se déconnecter") { _, _ ->
+                SecureLogin.signOut()
+                act.recreate()
+            }
+            .setNegativeButton("Fermer", null)
+            .show()
     }
 
     private fun showKeepAliveDialog() {
@@ -711,6 +734,10 @@ class SellFragment : Fragment() {
             .setNegativeButton("Fermer", null)
             .create()
 
+        dialogBinding.optSecureLogin.setOnClickListener {
+            dialog.dismiss()
+            showSecureLoginDialog()
+        }
         dialogBinding.optKeepAlive.setOnClickListener {
             dialog.dismiss()
             showKeepAliveDialog()

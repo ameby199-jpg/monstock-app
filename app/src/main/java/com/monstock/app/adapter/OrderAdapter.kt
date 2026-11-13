@@ -63,7 +63,6 @@ class OrderAdapter(
             val info = StringBuilder("🌐 Commande en ligne")
             if (order.customerName.isNotBlank()) info.append("\n👤 ${order.customerName}")
             if (order.customerPhone.isNotBlank()) info.append("\n📞 ${order.customerPhone}  (toucher = WhatsApp)")
-            if (order.note.isNotBlank()) info.append("\n📝 ${order.note}")
             val infoView = TextView(context).apply {
                 text = info.toString()
                 textSize = 13f
@@ -85,6 +84,20 @@ class OrderAdapter(
                 }
             }
             holder.binding.llOrderItems.addView(infoView)
+            if (order.note.isNotBlank()) {
+                val noteView = TextView(context).apply {
+                    text = "📝 Précision du client :\n${order.note}"
+                    textSize = 15f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(Color.parseColor("#FFB300"))
+                    setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                    setBackgroundColor(Color.parseColor("#26FFB300"))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (8 * density).toInt() }
+                }
+                holder.binding.llOrderItems.addView(noteView)
+            }
         }
         order.items.forEach { line ->
             val row = LinearLayout(context).apply {

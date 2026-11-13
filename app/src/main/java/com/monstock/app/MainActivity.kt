@@ -10,6 +10,7 @@ import com.monstock.app.ui.SalesFragment
 import com.monstock.app.ui.SellFragment
 import com.monstock.app.ui.StockFragment
 import com.monstock.app.util.EmployeeSession
+import com.monstock.app.util.SecureLogin
 import com.monstock.app.util.ThemePrefs
 
 class MainActivity : AppCompatActivity() {
@@ -40,7 +41,13 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             // Le code personnel est redemandé à chaque ouverture de l'app, avant tout accès.
             EmployeeSession.logout(this)
-            showLogin()
+            if (SecureLogin.isSignedIn()) {
+                showLogin()
+            } else {
+                // Connexion sécurisée avant d'écouter les données (avec « Plus tard » pour ne jamais bloquer).
+                binding.bottomNav.visibility = android.view.View.GONE
+                SecureLogin.showDialog(this, onSuccess = { showLogin() }, onLater = { showLogin() })
+            }
         }
     }
 

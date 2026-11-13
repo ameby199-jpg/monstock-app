@@ -69,4 +69,12 @@
         android:textSize="16sp"
         android:padding="16dp" />
 
+    <TextView
+        android:id="@+id/optSecureLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔐  Connexion sécurisée"
+        android:textSize="16sp"
+        android:padding="16dp" />
+
 </LinearLayout>

@@ -169,6 +169,7 @@ class FirebaseRepo(private val shopCode: String) {
                         customerProfile = d.getString("customerProfile") ?: "",
                         customerName = d.getString("customerName") ?: "",
                         customerPhone = d.getString("customerPhone") ?: "",
+                        note = d.getString("note") ?: "",
                         ownerId = shopCode
                     )
                 }
@@ -315,7 +316,8 @@ class FirebaseRepo(private val shopCode: String) {
                 "employeeName" to employeeName,
                 "customerProfile" to line.customerProfile,
                 "customerName" to order.customerName,
-                "customerPhone" to order.customerPhone
+                "customerPhone" to order.customerPhone,
+                "note" to order.note
             )
             shopDoc().collection("sales").add(sale)
                 .addOnFailureListener { e -> onError(e.localizedMessage ?: "Échec de l'enregistrement de la vente") }
@@ -370,7 +372,7 @@ class FirebaseRepo(private val shopCode: String) {
     fun syncCatalog(pid: String, products: List<Product>) {
         val col = catalogDoc(pid).collection("products")
         products.forEach { p ->
-            val hash = listOf(p.name, p.price, p.quantity, p.isDerived, p.photoBase64.length, p.photoBase64.hashCode()).hashCode()
+            val hash = listOf(p.name, p.price, p.quantity, p.isDerived, p.photoBase64.length, p.photoBase64.hashCode(), p.composants).hashCode()
             if (syncedHashes[p.id] != hash) {
                 syncedHashes[p.id] = hash
                 col.document(p.id).set(
@@ -379,6 +381,7 @@ class FirebaseRepo(private val shopCode: String) {
                         "price" to p.price,
                         "quantity" to p.quantity,
                         "isDerived" to p.isDerived,
+                        "composants" to p.composants,
                         "photoBase64" to p.photoBase64
                     )
                 ).addOnFailureListener { syncedHashes.remove(p.id) }
@@ -483,8 +486,10 @@ class FirebaseRepo(private val shopCode: String) {
     fun setOnlineStatus(order: Order, state: String) {
         val pid = publicId ?: return
         if (order.source != "web" || order.onlineId.isBlank()) return
+        val total = order.items.sumOf { it.unitPrice * it.quantity }
+        val lines = order.items.map { "${it.quantity} × ${it.productName}" }
         catalogDoc(pid).collection("status").document(order.onlineId)
-            .set(hashMapOf("state" to state, "updatedAt" to System.currentTimeMillis()))
+            .set(hashMapOf("state" to state, "updatedAt" to System.currentTimeMillis(), "total" to total, "lines" to lines))
     }
 
     /** Bouton « Prêt » : le client voit « Votre commande est prête » sur sa page, et la commande est marquée. */
